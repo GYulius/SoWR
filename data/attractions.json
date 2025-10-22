@@ -1,0 +1,346 @@
+[
+  {
+    "id": 1,
+    "name": "Sagrada Familia",
+    "port_id": 1,
+    "category": "Historical Sites",
+    "description": "Antoni Gaudí's unfinished masterpiece, a UNESCO World Heritage Site and Barcelona's most iconic landmark.",
+    "latitude": 41.4036,
+    "longitude": 2.1744,
+    "rating": 4.8,
+    "price_range": "medium",
+    "opening_hours": {
+      "monday": "09:00-18:00",
+      "tuesday": "09:00-18:00",
+      "wednesday": "09:00-18:00",
+      "thursday": "09:00-18:00",
+      "friday": "09:00-18:00",
+      "saturday": "09:00-18:00",
+      "sunday": "09:00-18:00"
+    },
+    "contact_info": {
+      "phone": "+34 932 080 414",
+      "website": "https://sagradafamilia.org",
+      "email": "info@sagradafamilia.org"
+    },
+    "accessibility_features": ["wheelchair_accessible", "audio_guide", "elevator"],
+    "images": [
+      "https://example.com/sagrada1.jpg",
+      "https://example.com/sagrada2.jpg"
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Park Güell",
+    "port_id": 1,
+    "category": "Nature & Parks",
+    "description": "A public park system composed of gardens and architectural elements located on Carmel Hill.",
+    "latitude": 41.4145,
+    "longitude": 2.1527,
+    "rating": 4.6,
+    "price_range": "low",
+    "opening_hours": {
+      "monday": "08:00-21:30",
+      "tuesday": "08:00-21:30",
+      "wednesday": "08:00-21:30",
+      "thursday": "08:00-21:30",
+      "friday": "08:00-21:30",
+      "saturday": "08:00-21:30",
+      "sunday": "08:00-21:30"
+    },
+    "contact_info": {
+      "phone": "+34 932 130 488",
+      "website": "https://parkguell.barcelona"
+    },
+    "accessibility_features": ["wheelchair_accessible", "guided_tours"],
+    "images": [
+      "https://example.com/parkguell1.jpg",
+      "https://example.com/parkguell2.jpg"
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Colosseum",
+    "port_id": 2,
+    "category": "Historical Sites",
+    "description": "An oval amphitheatre in the centre of Rome, Italy, built of travertine limestone, tuff, and brick-faced concrete.",
+    "latitude": 41.8902,
+    "longitude": 12.4922,
+    "rating": 4.7,
+    "price_range": "medium",
+    "opening_hours": {
+      "monday": "08:30-16:30",
+      "tuesday": "08:30-16:30",
+      "wednesday": "08:30-16:30",
+      "thursday": "08:30-16:30",
+      "friday": "08:30-16:30",
+      "saturday": "08:30-16:30",
+      "sunday": "08:30-16:30"
+    },
+    "contact_info": {
+      "phone": "+39 06 3996 7700",
+      "website": "https://www.coopculture.it"
+    },
+    "accessibility_features": ["wheelchair_accessible", "audio_guide"],
+    "images": [
+      "https://example.com/colosseum1.jpg",
+      "https://example.com/colosseum2.jpg"
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Vatican Museums",
+    "port_id": 2,
+    "category": "Cultural",
+    "description": "The public art and sculpture museums in the Vatican City, displaying works from the immense collection amassed by the Catholic Church.",
+    "latitude": 41.9069,
+    "longitude": 12.4534,
+    "rating": 4.9,
+    "price_range": "medium",
+    "opening_hours": {
+      "monday": "08:00-18:00",
+      "tuesday": "08:00-18:00",
+      "wednesday": "08:00-18:00",
+      "thursday": "08:00-18:00",
+      "friday": "08:00-18:00",
+      "saturday": "08:00-18:00",
+      "sunday": "08:00-18:00"
+    },
+    "contact_info": {
+      "phone": "+39 06 6988 4676",
+      "website": "https://www.museivaticani.va"
+    },
+    "accessibility_features": ["wheelchair_accessible", "audio_guide", "guided_tours"],
+    "images": [
+      "https://example.com/vatican1.jpg",
+      "https://example.com/vatican2.jpg"
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Acropolis of Athens",
+    "port_id": 3,
+    "category": "Historical Sites",
+    "description": "An ancient citadel located on a rocky outcrop above the city of Athens, containing the remains of several ancient buildings.",
+    "latitude": 37.9715,
+    "longitude": 23.7267,
+    "rating": 4.8,
+    "price_range": "medium",
+    "opening_hours": {
+      "monday": "08:00-20:00",
+      "tuesday": "08:00-20:00",
+      "wednesday": "08:00-20:00",
+      "thursday": "08:00-20:00",
+      "friday": "08:00-20:00",
+      "saturday": "08:00-20:00",
+      "sunday": "08:00-20:00"
+    },
+    "contact_info": {
+      "phone": "+30 210 321 4172",
+      "website": "https://www.odysseus.culture.gr"
+    },
+    "accessibility_features": ["audio_guide", "guided_tours"],
+    "images": [
+      "https://example.com/acropolis1.jpg",
+      "https://example.com/acropolis2.jpg"
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Hagia Sophia",
+    "port_id": 4,
+    "category": "Historical Sites",
+    "description": "A former Greek Orthodox Christian patriarchal cathedral, later an Ottoman imperial mosque and now a museum in Istanbul.",
+    "latitude": 41.0086,
+    "longitude": 28.9802,
+    "rating": 4.7,
+    "price_range": "medium",
+    "opening_hours": {
+      "monday": "09:00-17:00",
+      "tuesday": "09:00-17:00",
+      "wednesday": "09:00-17:00",
+      "thursday": "09:00-17:00",
+      "friday": "09:00-17:00",
+      "saturday": "09:00-17:00",
+      "sunday": "09:00-17:00"
+    },
+    "contact_info": {
+      "phone": "+90 212 522 1750",
+      "website": "https://ayasofyacamii.gov.tr"
+    },
+    "accessibility_features": ["wheelchair_accessible", "audio_guide"],
+    "images": [
+      "https://example.com/hagiasophia1.jpg",
+      "https://example.com/hagiasophia2.jpg"
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Promenade des Anglais",
+    "port_id": 5,
+    "category": "Nature & Parks",
+    "description": "A celebrated promenade along the Mediterranean coast of Nice, France.",
+    "latitude": 43.6959,
+    "longitude": 7.2644,
+    "rating": 4.5,
+    "price_range": "free",
+    "opening_hours": {
+      "monday": "24/7",
+      "tuesday": "24/7",
+      "wednesday": "24/7",
+      "thursday": "24/7",
+      "friday": "24/7",
+      "saturday": "24/7",
+      "sunday": "24/7"
+    },
+    "contact_info": {
+      "website": "https://www.nicetourisme.com"
+    },
+    "accessibility_features": ["wheelchair_accessible"],
+    "images": [
+      "https://example.com/promenade1.jpg",
+      "https://example.com/promenade2.jpg"
+    ]
+  },
+  {
+    "id": 8,
+    "name": "St. Mark's Basilica",
+    "port_id": 6,
+    "category": "Historical Sites",
+    "description": "The cathedral church of the Roman Catholic Archdiocese of Venice, historically the patriarch's cathedral.",
+    "latitude": 45.4342,
+    "longitude": 12.3398,
+    "rating": 4.6,
+    "price_range": "low",
+    "opening_hours": {
+      "monday": "09:30-17:00",
+      "tuesday": "09:30-17:00",
+      "wednesday": "09:30-17:00",
+      "thursday": "09:30-17:00",
+      "friday": "09:30-17:00",
+      "saturday": "09:30-17:00",
+      "sunday": "14:00-17:00"
+    },
+    "contact_info": {
+      "phone": "+39 041 270 8311",
+      "website": "https://www.basilicasanmarco.it"
+    },
+    "accessibility_features": ["wheelchair_accessible", "audio_guide"],
+    "images": [
+      "https://example.com/stmarks1.jpg",
+      "https://example.com/stmarks2.jpg"
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Windmills of Mykonos",
+    "port_id": 7,
+    "category": "Historical Sites",
+    "description": "The famous windmills of Mykonos are a defining feature of the Greek island landscape.",
+    "latitude": 37.4500,
+    "longitude": 25.3333,
+    "rating": 4.4,
+    "price_range": "free",
+    "opening_hours": {
+      "monday": "24/7",
+      "tuesday": "24/7",
+      "wednesday": "24/7",
+      "thursday": "24/7",
+      "friday": "24/7",
+      "saturday": "24/7",
+      "sunday": "24/7"
+    },
+    "contact_info": {
+      "website": "https://www.mykonos.gr"
+    },
+    "accessibility_features": [],
+    "images": [
+      "https://example.com/windmills1.jpg",
+      "https://example.com/windmills2.jpg"
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Oia Village",
+    "port_id": 8,
+    "category": "Cultural",
+    "description": "A small town and former community in the South Aegean on the islands of Thira and Therasia.",
+    "latitude": 36.4619,
+    "longitude": 25.3753,
+    "rating": 4.9,
+    "price_range": "free",
+    "opening_hours": {
+      "monday": "24/7",
+      "tuesday": "24/7",
+      "wednesday": "24/7",
+      "thursday": "24/7",
+      "friday": "24/7",
+      "saturday": "24/7",
+      "sunday": "24/7"
+    },
+    "contact_info": {
+      "website": "https://www.santorini.gr"
+    },
+    "accessibility_features": ["wheelchair_accessible"],
+    "images": [
+      "https://example.com/oia1.jpg",
+      "https://example.com/oia2.jpg"
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Dubrovnik Old Town",
+    "port_id": 9,
+    "category": "Historical Sites",
+    "description": "The historic core of Dubrovnik, Croatia, a UNESCO World Heritage Site.",
+    "latitude": 42.6507,
+    "longitude": 18.0944,
+    "rating": 4.8,
+    "price_range": "low",
+    "opening_hours": {
+      "monday": "24/7",
+      "tuesday": "24/7",
+      "wednesday": "24/7",
+      "thursday": "24/7",
+      "friday": "24/7",
+      "saturday": "24/7",
+      "sunday": "24/7"
+    },
+    "contact_info": {
+      "website": "https://www.dubrovnik.hr"
+    },
+    "accessibility_features": ["wheelchair_accessible", "guided_tours"],
+    "images": [
+      "https://example.com/dubrovnik1.jpg",
+      "https://example.com/dubrovnik2.jpg"
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Kotor Old Town",
+    "port_id": 10,
+    "category": "Historical Sites",
+    "description": "A fortified town on Montenegro's Adriatic coast, in a bay near the limestone cliffs of Mt. Lovćen.",
+    "latitude": 42.4247,
+    "longitude": 18.7712,
+    "rating": 4.6,
+    "price_range": "free",
+    "opening_hours": {
+      "monday": "24/7",
+      "tuesday": "24/7",
+      "wednesday": "24/7",
+      "thursday": "24/7",
+      "friday": "24/7",
+      "saturday": "24/7",
+      "sunday": "24/7"
+    },
+    "contact_info": {
+      "website": "https://www.kotor.me"
+    },
+    "accessibility_features": ["wheelchair_accessible", "guided_tours"],
+    "images": [
+      "https://example.com/kotor1.jpg",
+      "https://example.com/kotor2.jpg"
+    ]
+  }
+]
