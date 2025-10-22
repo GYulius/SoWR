@@ -193,8 +193,8 @@ The application will be available at:
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/cruise_recommender
-    username: cruise_app
-    password: your_password
+    username: xx
+    password: xx
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 # Redis Configuration
@@ -203,22 +203,22 @@ spring:
     redis:
       host: localhost
       port: 6379
-      password: your_redis_password
+      password: xx
 
 # External APIs
 google:
   maps:
     api:
-      key: your_google_maps_key
+      key: xx
 weather:
   api:
-    key: your_weather_api_key
+    key: xx
 sparql:
   endpoint: https://your-sparql-endpoint.com/sparql
 
 # Security
 jwt:
-  secret: your_jwt_secret
+  secret: xx
   expiration: 604800000
 
 # Notification Services
@@ -226,8 +226,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: your_email
-    password: your_password
+    username: xx
+    password: xx
 ```
 
 ## 📚 API Documentation
@@ -408,8 +408,8 @@ We welcome contributions from the community! Please follow these guidelines:
 
 ### Commercial Support
 For enterprise support and custom implementations, contact us at:
-- Email: enterprise@cruise-recommender.com
-- Phone: +1 (555) 123-4567
+- Email: enterprise@xx (TBD)
+- Phone: +1 (234) 567-890 (TBD)
 
 ## 📄 License
 
@@ -427,6 +427,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for the cruise tourism community**
 
-[Website](https://cruise-recommender.com) • [Blog](https://blog.cruise-recommender.com) • [Twitter](https://twitter.com/cruise_recommender)
+[Website](https://xxTBDxx) • [Blog](https://blog.xxTBDxx) • [Twitter](https://twitter.com/xxTBDxx)
 
 </div>
