@@ -9,6 +9,10 @@ Thank you for your interest in contributing to the Social Web Recommender projec
 - Maven 3.8+
 - MySQL 8.0 or higher
 - Redis 6.0 or higher
+- RabbitMQ 3.12+ (for message queuing)
+- Elasticsearch 8.0+ (for AIS data search)
+- Apache Spark 3.5+ (for big data processing)
+- Prometheus & Grafana (for monitoring)
 - Git
 
 ### Development Setup
@@ -58,7 +62,18 @@ Thank you for your interest in contributing to the Social Web Recommender projec
 - Write unit tests for new services and utilities
 - Include integration tests for API endpoints
 - Test with different user roles and permissions
+- Test passenger-focused recommendations with various interest profiles
+- Test social media analysis with sample data (respecting privacy)
+- Test AIS data processing with mock ship positions
+- Test Spark jobs with sample datasets
 - Ensure tests pass before submitting PR
+
+### Passenger-Focused Development Guidelines
+- **Priority**: Passenger interests and preferences are the primary focus
+- **Privacy**: Always require explicit consent for social media analysis
+- **Interest Sources**: Prioritize voluntarily expressed interests over inferred ones
+- **Recommendations**: Focus on locally active venues during port calls
+- **Personalization**: Use multi-factor scoring (interests, local recommendations, ratings)
 
 ### Documentation
 - Update README.md for significant changes
@@ -71,11 +86,36 @@ Thank you for your interest in contributing to the Social Web Recommender projec
 ```
 src/main/java/com/cruise/recommender/
 ├── controller/          # REST controllers
+│   ├── PassengerRecommendationController.java  # Passenger-focused recommendations
+│   ├── DashboardController.java               # Ship tracking dashboard
+│   ├── RecommendationController.java          # General recommendations
+│   └── PublisherController.java               # Publisher management
 ├── service/            # Business logic services
+│   ├── SocialMediaAnalysisService.java        # Social media analysis
+│   ├── ShoreExcursionRecommendationService.java # Shore excursion recommendations
+│   ├── MealVenueRecommendationService.java    # Meal venue recommendations
+│   ├── AisDataService.java                    # AIS ship tracking
+│   ├── SparkMlService.java                    # Spark ML processing
+│   ├── PageRankService.java                   # Social network analysis
+│   └── RecommendationService.java             # Core recommendation engine
 ├── repository/         # Data access layer
+│   ├── PassengerRepository.java
+│   ├── AisDataRepository.java
+│   ├── ShoreExcursionRepository.java
+│   └── MealVenueRepository.java
 ├── entity/             # JPA entities
+│   ├── Passenger.java                         # Passenger entity (priority)
+│   ├── PassengerInterest.java                 # Interest tracking
+│   ├── SocialMediaProfile.java                # Social media data
+│   ├── ShoreExcursion.java                    # Shore excursions
+│   ├── MealVenue.java                         # Breakfast/lunch venues
+│   ├── AisData.java                           # AIS tracking data
+│   └── CruiseShip.java                        # Cruise ship data
 ├── dto/                # Data transfer objects
 ├── config/             # Configuration classes
+│   ├── RabbitMQConfig.java                    # RabbitMQ setup
+│   ├── ElasticsearchConfig.java               # Elasticsearch setup
+│   └── PrometheusConfig.java                  # Prometheus metrics
 └── SocialWebRecommenderApplication.java
 
 src/main/resources/
@@ -87,7 +127,13 @@ database/
 └── schema.sql          # Database schema
 
 docs/
-└── architecture/       # Architecture documentation
+├── architecture/       # Architecture documentation
+│   └── C4-Level1-Context.md
+├── grafana/            # Grafana dashboards
+│   └── dashboard-ship-tracking.json
+├── kibana/             # Kibana visualizations
+│   └── dashboard-analytics.json
+└── ADVANCED_ANALYTICS.md # Advanced analytics guide
 ```
 
 ## 🔧 Development Workflow
@@ -145,11 +191,31 @@ For feature requests, please provide:
 
 ## 📚 Resources
 
+### Core Technologies
 - [Spring Boot Documentation](https://spring.io/projects/spring-boot)
 - [Spring Data JPA Documentation](https://spring.io/projects/spring-data-jpa)
 - [MySQL Documentation](https://dev.mysql.com/doc/)
 - [Redis Documentation](https://redis.io/documentation)
 - [OpenAPI Specification](https://swagger.io/specification/)
+
+### Advanced Technologies
+- [Apache Spark Documentation](https://spark.apache.org/docs/latest/)
+- [Spark MLlib Guide](https://spark.apache.org/docs/latest/ml-guide.html)
+- [RabbitMQ Documentation](https://www.rabbitmq.com/documentation.html)
+- [Elasticsearch Guide](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Grafana Documentation](https://grafana.com/docs/)
+- [Apache Jena Documentation](https://jena.apache.org/documentation/)
+
+### Analytics & ML
+- [PageRank Algorithm](https://en.wikipedia.org/wiki/PageRank)
+- [Collaborative Filtering](https://en.wikipedia.org/wiki/Collaborative_filtering)
+- [Long Tail Recommendations](https://en.wikipedia.org/wiki/Long_tail)
+- [AIS (Automatic Identification System)](https://en.wikipedia.org/wiki/Automatic_identification_system)
+
+### Project-Specific Documentation
+- [Advanced Analytics Guide](docs/ADVANCED_ANALYTICS.md)
+- [C4 Architecture Documentation](docs/architecture/C4-Level1-Context.md)
 
 ## 🤝 Code of Conduct
 
