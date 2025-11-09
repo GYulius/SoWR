@@ -249,7 +249,7 @@ The application will be available at:
 
 ```yaml
 # Database Configuration
-spring:
+springDB:
   datasource:
     url: jdbc:mysql://localhost:3306/cruise_recommender
     username: cruise_app
@@ -257,7 +257,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 # Redis Configuration
-spring:
+springRedis:
   data:
     redis:
       host: localhost
@@ -355,7 +355,7 @@ GET /api/v1/ports/{id}/cruises
 {
   "success": true,
   "data": {
-    // Response data
+    "comments": "Response data"
   },
   "meta": {
     "timestamp": "2024-01-01T00:00:00Z",
