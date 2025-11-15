@@ -1,0 +1,135 @@
+{
+  "title": "Cruise Recommender Analytics Dashboard",
+  "description": "Kibana dashboard for analyzing AIS data, recommendations, and user behavior",
+  "version": "1.0.0",
+  "panels": [
+    {
+      "id": "ship-positions-map",
+      "type": "map",
+      "title": "Real-time Ship Positions",
+      "indexPattern": "ais-data-*",
+      "query": {
+        "match_all": {}
+      },
+      "visualization": {
+        "type": "coordinate_map",
+        "field": "location",
+        "size": "speed"
+      }
+    },
+    {
+      "id": "ais-signal-quality",
+      "type": "pie",
+      "title": "AIS Signal Quality Distribution",
+      "indexPattern": "ais-data-*",
+      "query": {
+        "range": {
+          "timestamp": {
+            "gte": "now-24h"
+          }
+        }
+      },
+      "visualization": {
+        "type": "pie",
+        "field": "signal_quality",
+        "size": "doc_count"
+      }
+    },
+    {
+      "id": "ship-speed-distribution",
+      "type": "histogram",
+      "title": "Ship Speed Distribution",
+      "indexPattern": "ais-data-*",
+      "visualization": {
+        "type": "histogram",
+        "field": "speed",
+        "interval": 1
+      }
+    },
+    {
+      "id": "recommendation-performance",
+      "type": "line",
+      "title": "Recommendation Performance Over Time",
+      "indexPattern": "recommendations-*",
+      "visualization": {
+        "type": "line",
+        "xAxis": "timestamp",
+        "yAxis": "score",
+        "split": "item_type"
+      }
+    },
+    {
+      "id": "user-engagement",
+      "type": "bar",
+      "title": "User Engagement by Category",
+      "indexPattern": "user-interactions-*",
+      "visualization": {
+        "type": "bar",
+        "xAxis": "item_type",
+        "yAxis": "doc_count"
+      }
+    },
+    {
+      "id": "long-tail-items",
+      "type": "table",
+      "title": "Long Tail Recommendation Items",
+      "indexPattern": "recommendations-*",
+      "query": {
+        "range": {
+          "popularity": {
+            "lt": 10
+          }
+        }
+      },
+      "visualization": {
+        "type": "table",
+        "columns": ["item_id", "item_name", "score", "popularity"]
+      }
+    },
+    {
+      "id": "pagerank-influence",
+      "type": "heatmap",
+      "title": "PageRank Influence Heatmap",
+      "indexPattern": "pagerank-scores-*",
+      "visualization": {
+        "type": "heatmap",
+        "xAxis": "user_id",
+        "yAxis": "publisher_id",
+        "value": "pagerank_score"
+      }
+    },
+    {
+      "id": "ships-approaching-ports",
+      "type": "table",
+      "title": "Ships Approaching Ports (Next 24h)",
+      "indexPattern": "ais-data-*",
+      "query": {
+        "bool": {
+          "must": [
+            {
+              "exists": {
+                "field": "destination"
+              }
+            },
+            {
+              "range": {
+                "eta": {
+                  "gte": "now",
+                  "lte": "now+24h"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "visualization": {
+        "type": "table",
+        "columns": ["ship_name", "destination", "eta", "distance_to_port", "speed"]
+      }
+    }
+  ],
+  "refreshInterval": {
+    "pause": false,
+    "value": 10000
+  }
+}

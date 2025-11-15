@@ -1,5 +1,7 @@
 package com.cruise.recommender.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -20,11 +22,15 @@ public class RabbitMQConfig {
     public static final String NOTIFICATION_QUEUE = "notification.queue";
     public static final String RECOMMENDATION_QUEUE = "recommendation.queue";
     public static final String ANALYTICS_QUEUE = "analytics.queue";
+    public static final String SOCIAL_MEDIA_QUEUE = "social.media.queue";
+    public static final String KNOWLEDGE_GRAPH_QUEUE = "knowledge.graph.queue";
     
     // Exchange names
     public static final String AIS_EXCHANGE = "ais.exchange";
     public static final String NOTIFICATION_EXCHANGE = "notification.exchange";
     public static final String RECOMMENDATION_EXCHANGE = "recommendation.exchange";
+    public static final String SOCIAL_MEDIA_EXCHANGE = "social.media.exchange";
+    public static final String KNOWLEDGE_GRAPH_EXCHANGE = "knowledge.graph.exchange";
     
     // Routing keys
     public static final String SHIP_POSITION_UPDATE = "ship.position.update";
@@ -93,6 +99,40 @@ public class RabbitMQConfig {
     }
     
     /**
+     * Social Media Exchange
+     */
+    @Bean
+    public TopicExchange socialMediaExchange() {
+        return new TopicExchange(SOCIAL_MEDIA_EXCHANGE);
+    }
+    
+    /**
+     * Social Media Queue
+     */
+    @Bean
+    public Queue socialMediaQueue() {
+        return QueueBuilder.durable(SOCIAL_MEDIA_QUEUE)
+                .withArgument("x-message-ttl", 86400000) // 24 hours TTL
+                .build();
+    }
+    
+    /**
+     * Knowledge Graph Exchange
+     */
+    @Bean
+    public TopicExchange knowledgeGraphExchange() {
+        return new TopicExchange(KNOWLEDGE_GRAPH_EXCHANGE);
+    }
+    
+    /**
+     * Knowledge Graph Queue
+     */
+    @Bean
+    public Queue knowledgeGraphQueue() {
+        return QueueBuilder.durable(KNOWLEDGE_GRAPH_QUEUE).build();
+    }
+    
+    /**
      * Bindings
      */
     @Bean
@@ -135,12 +175,34 @@ public class RabbitMQConfig {
                 .with(RECOMMENDATION_UPDATE);
     }
     
+    @Bean
+    public Binding socialMediaBinding() {
+        return BindingBuilder
+                .bind(socialMediaQueue())
+                .to(socialMediaExchange())
+                .with("social.media.*");
+    }
+    
+    @Bean
+    public Binding knowledgeGraphBinding() {
+        return BindingBuilder
+                .bind(knowledgeGraphQueue())
+                .to(knowledgeGraphExchange())
+                .with("knowledge.graph.*");
+    }
+    
     /**
      * Message converter for JSON
+     * Configured to handle Java 8 time types (LocalDateTime, etc.)
      */
     @Bean
     public MessageConverter jsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(objectMapper);
+        return converter;
     }
     
     /**

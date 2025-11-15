@@ -4,6 +4,9 @@ import com.cruise.recommender.entity.AisData;
 import com.cruise.recommender.entity.CruiseShip;
 import com.cruise.recommender.repository.AisDataRepository;
 import com.cruise.recommender.repository.CruiseShipRepository;
+import com.cruise.recommender.repository.elasticsearch.AisDataDocument;
+import com.cruise.recommender.repository.elasticsearch.AisDataDocumentMapper;
+import com.cruise.recommender.repository.elasticsearch.AisDataElasticsearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -31,6 +34,9 @@ public class AisDataService {
     private final CruiseShipRepository cruiseShipRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final AisDataElasticsearchRepository aisDataElasticsearchRepository;
+    private final AisDataDocumentMapper documentMapper;
+    private final KnowledgeGraphSparkService knowledgeGraphService;
     
     private static final String AIS_QUEUE = "ais.data.queue";
     private static final String AIS_EXCHANGE = "ais.exchange";
@@ -40,6 +46,29 @@ public class AisDataService {
      */
     @RabbitListener(queues = AIS_QUEUE)
     public void processAisData(AisDataMessage message) {
+        // Validate message
+        if (message == null) {
+            log.warn("Received null AIS data message, skipping");
+            return;
+        }
+        
+        // Validate MMSI - it's required
+        String mmsi = message.getMmsi();
+        if (mmsi == null || mmsi.trim().isEmpty() || "null".equalsIgnoreCase(mmsi)) {
+            log.warn("Received AIS data message with null or empty MMSI, skipping. " +
+                    "Ship name: {}, Data source: {}, Message: {}", 
+                    message.getShipName(), 
+                    message.getDataSource() != null ? message.getDataSource() : "unknown",
+                    message);
+            
+            // This might be an old message from before validation was added
+            // Consider purging the RabbitMQ queue if this persists
+            return;
+        }
+        
+        // Ensure MMSI is trimmed
+        message.setMmsi(mmsi.trim());
+        
         log.info("Processing AIS data for MMSI: {}", message.getMmsi());
         
         try {
@@ -76,6 +105,13 @@ public class AisDataService {
             // Update ship's current position
             updateShipPosition(ship, aisData);
             
+            // Process to Knowledge Graph (RDF)
+            try {
+                knowledgeGraphService.processAisDataToRDF(message);
+            } catch (Exception e) {
+                log.warn("Failed to process AIS data to Knowledge Graph, continuing anyway", e);
+            }
+            
             // Publish to WebSocket for real-time updates
             publishPositionUpdate(ship, aisData);
             
@@ -97,8 +133,13 @@ public class AisDataService {
         }
         
         // Create new ship record
+        // Extract cruise line from ship name if possible (e.g., "Royal Caribbean Harmony" -> "Royal Caribbean")
+        String cruiseLine = extractCruiseLine(message.getShipName());
+        
         CruiseShip newShip = CruiseShip.builder()
                 .name(message.getShipName())
+                .cruiseLine(cruiseLine)
+                .capacity(estimateCapacityFromShipName(message.getShipName())) // Estimate capacity
                 .mmsi(message.getMmsi())
                 .imo(message.getImo())
                 .callSign(message.getCallSign())
@@ -107,6 +148,61 @@ public class AisDataService {
                 .build();
         
         return cruiseShipRepository.save(newShip);
+    }
+    
+    /**
+     * Extract cruise line from ship name
+     */
+    private String extractCruiseLine(String shipName) {
+        if (shipName == null || shipName.isEmpty()) {
+            return "Unknown Cruise Line";
+        }
+        
+        // Common cruise line patterns
+        String[] cruiseLines = {
+            "Royal Caribbean", "MSC", "Carnival", "Norwegian", 
+            "Celebrity", "Princess", "Holland America", "Costa"
+        };
+        
+        for (String line : cruiseLines) {
+            if (shipName.contains(line)) {
+                return line;
+            }
+        }
+        
+        // If no match, try to extract first word(s)
+        String[] parts = shipName.split("\\s+");
+        if (parts.length >= 2) {
+            return parts[0] + " " + parts[1]; // First two words
+        }
+        
+        return "Unknown Cruise Line";
+    }
+    
+    /**
+     * Estimate ship capacity based on ship name patterns
+     */
+    private Integer estimateCapacityFromShipName(String shipName) {
+        if (shipName == null || shipName.isEmpty()) {
+            return 2000; // Default medium-sized ship
+        }
+        
+        String lowerName = shipName.toLowerCase();
+        
+        // Large ships (5000+)
+        if (lowerName.contains("harmony") || lowerName.contains("symphony") || 
+            lowerName.contains("grandiosa") || lowerName.contains("mardi gras")) {
+            return 5000 + (int)(Math.random() * 2000); // 5000-7000
+        }
+        
+        // Medium-large ships (3000-5000)
+        if (lowerName.contains("vista") || lowerName.contains("escape") || 
+            lowerName.contains("edge") || lowerName.contains("regal")) {
+            return 3000 + (int)(Math.random() * 2000); // 3000-5000
+        }
+        
+        // Medium ships (2000-3000)
+        return 2000 + (int)(Math.random() * 1000); // 2000-3000
     }
     
     /**
@@ -136,10 +232,12 @@ public class AisDataService {
      */
     private void indexInElasticsearch(AisData aisData) {
         try {
-            elasticsearchOperations.save(aisData);
+            AisDataDocument document = documentMapper.toDocument(aisData);
+            aisDataElasticsearchRepository.save(document);
             log.debug("Indexed AIS data in Elasticsearch for MMSI: {}", aisData.getMmsi());
         } catch (Exception e) {
             log.error("Error indexing AIS data in Elasticsearch", e);
+            // Don't fail the transaction if Elasticsearch indexing fails
         }
     }
     
@@ -203,14 +301,70 @@ public class AisDataService {
         }
     }
     
+    /**
+     * Search AIS data using Elasticsearch (fast full-text search)
+     */
+    @Transactional(readOnly = true)
+    public List<AisDataDocument> searchAisDataByShipName(String shipName) {
+        log.info("Searching AIS data by ship name: {}", shipName);
+        return aisDataElasticsearchRepository.findByShipNameContaining(shipName);
+    }
+    
+    /**
+     * Get AIS data history for a specific ship using Elasticsearch
+     */
+    @Transactional(readOnly = true)
+    public List<AisDataDocument> getShipHistory(String mmsi) {
+        log.info("Getting AIS history for MMSI: {}", mmsi);
+        return aisDataElasticsearchRepository.findByMmsiOrderByTimestampDesc(mmsi);
+    }
+    
+    /**
+     * Find AIS data in geographic area using Elasticsearch (faster than MySQL)
+     */
+    @Transactional(readOnly = true)
+    public List<AisDataDocument> findAisDataInArea(
+            Double minLat, Double maxLat, 
+            Double minLng, Double maxLng, 
+            LocalDateTime since) {
+        log.info("Searching AIS data in area using Elasticsearch");
+        return aisDataElasticsearchRepository.findByLatitudeBetweenAndLongitudeBetweenAndTimestampGreaterThanEqual(
+                minLat, maxLat, minLng, maxLng, since);
+    }
+    
+    /**
+     * Get recent AIS data using Elasticsearch
+     */
+    @Transactional(readOnly = true)
+    public List<AisDataDocument> getRecentAisData(int minutes) {
+        LocalDateTime since = LocalDateTime.now().minusMinutes(minutes);
+        log.info("Getting recent AIS data since {} minutes ago", minutes);
+        return aisDataElasticsearchRepository.findByTimestampGreaterThanEqual(since);
+    }
+    
+    /**
+     * Search AIS data by ship type using Elasticsearch
+     */
+    @Transactional(readOnly = true)
+    public List<AisDataDocument> findAisDataByShipType(String shipType) {
+        log.info("Searching AIS data by ship type: {}", shipType);
+        return aisDataElasticsearchRepository.findByShipType(shipType);
+    }
+    
     // DTOs for message handling
     @lombok.Data
     @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class AisDataMessage {
+        @com.fasterxml.jackson.annotation.JsonProperty(value = "mmsi", required = true)
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private String mmsi;
         private String shipName;
         private Double latitude;
         private Double longitude;
+        @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime timestamp;
         private Double speed;
         private Double course;
@@ -223,6 +377,20 @@ public class AisDataService {
         private Double stationRange;
         private String signalQuality;
         private String dataSource;
+        
+        /**
+         * Custom setter to ensure MMSI is trimmed and validated
+         * This is called by Jackson during deserialization
+         */
+        public void setMmsi(String mmsi) {
+            if (mmsi != null && !mmsi.trim().isEmpty() && !"null".equalsIgnoreCase(mmsi)) {
+                this.mmsi = mmsi.trim();
+            } else {
+                // Don't set null - this helps identify deserialization issues
+                this.mmsi = null;
+            }
+        }
+        
     }
     
     @lombok.Data

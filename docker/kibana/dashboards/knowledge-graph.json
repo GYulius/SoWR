@@ -1,0 +1,79 @@
+{
+  "version": "8.11.0",
+  "objects": [
+    {
+      "id": "knowledge-graph-dashboard",
+      "type": "dashboard",
+      "updated_at": "2024-01-01T00:00:00.000Z",
+      "version": "WzEsMV0=",
+      "attributes": {
+        "title": "Knowledge Graph Analytics",
+        "description": "Dashboard for analyzing Knowledge Graph data from AIS and Social Media",
+        "panelsJSON": "[{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":15,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":15,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"}]",
+        "options": {
+          "darkTheme": false,
+          "hidePanelTitles": false,
+          "useMargins": true
+        },
+        "version": "8.11.0",
+        "timeRestore": false,
+        "timeTo": "now",
+        "timeFrom": "now-24h",
+        "refreshInterval": {
+          "pause": false,
+          "value": 30000
+        },
+        "controlGroupInput": {
+          "controlStyle": "oneLine",
+          "chainingSystem": "HIERARCHICAL",
+          "controlGroupId": "control_group_1"
+        }
+      },
+      "references": [
+        {
+          "name": "panel_1",
+          "type": "visualization",
+          "id": "rdf-triples-count"
+        },
+        {
+          "name": "panel_2",
+          "type": "visualization",
+          "id": "passenger-interests"
+        }
+      ]
+    },
+    {
+      "id": "rdf-triples-count",
+      "type": "visualization",
+      "updated_at": "2024-01-01T00:00:00.000Z",
+      "version": "WzEsMV0=",
+      "attributes": {
+        "title": "RDF Triples Count Over Time",
+        "description": "Number of RDF triples in the Knowledge Graph over time",
+        "visState": "{\"title\":\"RDF Triples Count Over Time\",\"type\":\"histogram\",\"params\":{\"grid\":{\"categoryLines\":false,\"style\":{\"color\":\"#eee\"}},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"value\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\",\"mode\":\"normal\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}],\"seriesParams\":[{\"show\":true,\"type\":\"histogram\",\"mode\":\"stacked\",\"data\":{\"label\":\"Count\",\"id\":\"1\"},\"valueAxis\":\"ValueAxis-1\",\"drawLinesBetweenPoints\":true,\"showCircles\":true}],\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"times\":[],\"addTimeMarker\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"schema\":\"segment\",\"params\":{\"field\":\"@timestamp\",\"interval\":\"auto\",\"customInterval\":\"2h\",\"min_doc_count\":1,\"extended_bounds\":{}}}]}",
+        "uiStateJSON": "{}",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"ais_data\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      },
+      "references": []
+    },
+    {
+      "id": "passenger-interests",
+      "type": "visualization",
+      "updated_at": "2024-01-01T00:00:00.000Z",
+      "version": "WzEsMV0=",
+      "attributes": {
+        "title": "Passenger Interests by Category",
+        "description": "Distribution of passenger interests extracted from social media",
+        "visState": "{\"title\":\"Passenger Interests by Category\",\"type\":\"pie\",\"params\":{\"addTooltip\":true,\"addLegend\":true,\"legendPosition\":\"right\",\"isDonut\":true,\"labels\":{\"show\":false,\"values\":true,\"last_level\":true,\"truncate\":100}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"interest_category.keyword\",\"size\":10,\"order\":\"desc\",\"orderBy\":\"1\"}}]}",
+        "uiStateJSON": "{}",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"passenger_interests\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      },
+      "references": []
+    }
+  ]
+}
+

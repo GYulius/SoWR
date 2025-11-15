@@ -233,10 +233,24 @@ graph TB
    mvn spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=dev"
    ```
 
-4. **Start the application**
+4. **Start required services (Redis, RabbitMQ)**
+   ```bash
+   # Using Docker Compose (recommended)
+   docker-compose up -d redis rabbitmq
+   
+   # Or use the convenience script
+   # Windows PowerShell:
+   .\scripts\start-services.ps1
+   # Linux/Mac:
+   ./scripts/start-services.sh
+   ```
+
+5. **Start the application**
    ```bash
    mvn spring-boot:run
    ```
+   
+   **Note**: The application will automatically check for Redis and RabbitMQ availability on startup. If they're not running, the application will fail to start with clear error messages.
 
 The application will be available at:
 - **Web Interface**: `http://localhost:8080`

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Port Ship Tracking - Cruise Recommender</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .port-popup {
+            text-align: center;
+        }
+        .port-popup h3 {
+            margin: 5px 0;
+            color: #27ae60;
+        }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .info-panel h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+        .ship-count {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .radius-info {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="info-panel">
+        <h2>Port Area Tracking</h2>
+        <div class="ship-count" th:text="${#lists.size(ships)}">0</div>
+        <p>ships within radius</p>
+        <div class="radius-info">
+            <p><strong>Radius:</strong> <span th:text="${radius}">50</span> nautical miles</p>
+            <p><strong>Port:</strong> <span th:text="${portLat}">25.7617</span>, <span th:text="${portLng}">-80.1918</span></p>
+        </div>
+    </div>
+    
+    <script th:inline="javascript">
+        // Initialize map
+        var map = L.map('map').setView([/*[[${mapCenterLat}]]*/ 25.7617], /*[[${mapCenterLng}]]*/ -80.1918], /*[[${mapZoom}]]*/ 12);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Port location
+        var portLat = /*[[${portLat}]]*/ 25.7617;
+        var portLng = /*[[${portLng}]]*/ -80.1918;
+        var radius = /*[[${radius}]]*/ 50; // nautical miles
+        
+        // Convert nautical miles to degrees (approximate)
+        var radiusDegrees = radius / 60.0;
+        
+        // Add port marker
+        var portIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34]
+        });
+        
+        var portMarker = L.marker([portLat, portLng], {icon: portIcon})
+            .addTo(map)
+            .bindPopup('<div class="port-popup"><h3>Port</h3><p>Lat: ' + portLat + '</p><p>Lng: ' + portLng + '</p></div>');
+        
+        // Add radius circle
+        L.circle([portLat, portLng], {
+            color: 'blue',
+            fillColor: '#3498db',
+            fillOpacity: 0.1,
+            radius: radiusDegrees * 111000 // Convert to meters
+        }).addTo(map);
+        
+        // Ship data from server
+        var ships = /*[[${ships}]]*/ [];
+        
+        // Ship icon
+        var shipIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34]
+        });
+        
+        // Add ship markers
+        ships.forEach(function(ship) {
+            if (ship.latitude && ship.longitude) {
+                var marker = L.marker([ship.latitude, ship.longitude], {icon: shipIcon})
+                    .addTo(map);
+                
+                var popupContent = '<div class="ship-popup">' +
+                    '<h3>' + (ship.shipName || 'Unknown Ship') + '</h3>' +
+                    '<p><strong>MMSI:</strong> ' + (ship.mmsi || 'N/A') + '</p>' +
+                    '<p><strong>Speed:</strong> ' + (ship.speed ? ship.speed.toFixed(1) + ' knots' : 'N/A') + '</p>' +
+                    '<p><strong>Course:</strong> ' + (ship.course ? ship.course.toFixed(1) + '°' : 'N/A') + '</p>' +
+                    '<p><strong>Destination:</strong> ' + (ship.destination || 'N/A') + '</p>' +
+                    '</div>';
+                
+                marker.bindPopup(popupContent);
+            }
+        });
+        
+        // Fit map to show all ships and port
+        if (ships.length > 0) {
+            var group = new L.featureGroup([portMarker]);
+            ships.forEach(function(ship) {
+                if (ship.latitude && ship.longitude) {
+                    group.addLayer(L.marker([ship.latitude, ship.longitude]));
+                }
+            });
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>
+

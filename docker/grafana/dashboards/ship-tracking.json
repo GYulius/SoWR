@@ -1,0 +1,77 @@
+{
+  "dashboard": {
+    "title": "Ship Tracking Dashboard",
+    "tags": ["cruise", "ais", "ships"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Ships",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(ais_data_total{})",
+            "legendFormat": "Active Ships"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "AIS Data Ingestion Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ais_data_ingested_total[5m])",
+            "legendFormat": "Messages/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Ship Positions Map",
+        "type": "geomap",
+        "targets": [
+          {
+            "expr": "ais_ship_latitude",
+            "legendFormat": "Latitude"
+          },
+          {
+            "expr": "ais_ship_longitude",
+            "legendFormat": "Longitude"
+          }
+        ],
+        "gridPos": {"h": 10, "w": 18, "x": 0, "y": 4}
+      },
+      {
+        "id": 4,
+        "title": "Average Ship Speed",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "avg(ais_ship_speed)",
+            "legendFormat": "Knots"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 4}
+      },
+      {
+        "id": 5,
+        "title": "Signal Quality Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "count by (signal_quality) (ais_data_total)",
+            "legendFormat": "{{signal_quality}}"
+          }
+        ],
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 10}
+      }
+    ]
+  }
+}
+

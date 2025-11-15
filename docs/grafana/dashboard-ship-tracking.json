@@ -1,0 +1,122 @@
+{
+  "dashboard": {
+    "title": "Cruise Ship Tracking Dashboard",
+    "tags": ["cruise", "ais", "tracking"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Ships",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(cruise_ships_tracked_total)",
+            "legendFormat": "Tracked Ships"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Ships Out of Range",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(cruise_ships_out_of_range_total)",
+            "legendFormat": "Out of Range"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "AIS Signal Quality",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (signal_quality) (ais_signal_quality_total)",
+            "legendFormat": "{{signal_quality}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 4,
+        "title": "Ship Positions Map",
+        "type": "geomap",
+        "targets": [
+          {
+            "expr": "ais_ship_position{latitude!=\"\", longitude!=\"\"}",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 12}
+      },
+      {
+        "id": 5,
+        "title": "AIS Messages Received",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ais_messages_received_total[5m])",
+            "legendFormat": "Messages/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Average Ship Speed",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "avg(ais_ship_speed_knots)",
+            "legendFormat": "Knots"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 4}
+      },
+      {
+        "id": 7,
+        "title": "Ships Approaching Ports",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ais_ships_approaching_port",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "Recommendation Processing Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(recommendation_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "PageRank Scores Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(user_pagerank_score_bucket[5m]))",
+            "legendFormat": "Median PageRank"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
