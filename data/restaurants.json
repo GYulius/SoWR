@@ -1,0 +1,451 @@
+[
+  {
+    "id": 1,
+    "name": "El Celler de Can Roca",
+    "port_id": 1,
+    "category": "Fine Dining",
+    "description": "Three-Michelin-starred restaurant by the Roca brothers, offering innovative Catalan cuisine.",
+    "cuisine_type": "Catalan",
+    "latitude": 41.3851,
+    "longitude": 2.1734,
+    "rating": 4.9,
+    "price_range": "luxury",
+    "opening_hours": {
+      "monday": "closed",
+      "tuesday": "13:00-15:00, 20:00-22:00",
+      "wednesday": "13:00-15:00, 20:00-22:00",
+      "thursday": "13:00-15:00, 20:00-22:00",
+      "friday": "13:00-15:00, 20:00-22:00",
+      "saturday": "13:00-15:00, 20:00-22:00",
+      "sunday": "closed"
+    },
+    "contact_info": {
+      "phone": "+34 972 222 157",
+      "website": "https://cellercanroca.com",
+      "email": "info@cellercanroca.com"
+    },
+    "menu_items": [
+      "Tasting Menu - €250",
+      "Wine Pairing - €150",
+      "Vegetarian Menu - €200"
+    ],
+    "dietary_options": ["vegetarian", "vegan", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 45
+  },
+  {
+    "id": 2,
+    "name": "La Boqueria Market",
+    "port_id": 1,
+    "category": "Street Food",
+    "description": "Historic public market in the center of Barcelona, famous for its fresh produce and local delicacies.",
+    "cuisine_type": "Spanish",
+    "latitude": 41.3819,
+    "longitude": 2.1719,
+    "rating": 4.3,
+    "price_range": "budget",
+    "opening_hours": {
+      "monday": "08:00-20:30",
+      "tuesday": "08:00-20:30",
+      "wednesday": "08:00-20:30",
+      "thursday": "08:00-20:30",
+      "friday": "08:00-20:30",
+      "saturday": "08:00-20:30",
+      "sunday": "closed"
+    },
+    "contact_info": {
+      "website": "https://www.boqueria.barcelona"
+    },
+    "menu_items": [
+      "Fresh Fruits & Vegetables",
+      "Local Cheeses",
+      "Iberian Ham",
+      "Seafood",
+      "Tapas"
+    ],
+    "dietary_options": ["vegetarian", "vegan", "gluten_free"],
+    "reservation_required": false,
+    "max_capacity": 200
+  },
+  {
+    "id": 3,
+    "name": "Roscioli",
+    "port_id": 2,
+    "category": "Fine Dining",
+    "description": "Renowned Roman restaurant known for its traditional Italian cuisine and extensive wine selection.",
+    "cuisine_type": "Italian",
+    "latitude": 41.8976,
+    "longitude": 12.4768,
+    "rating": 4.7,
+    "price_range": "expensive",
+    "opening_hours": {
+      "monday": "12:00-15:00, 19:00-23:00",
+      "tuesday": "12:00-15:00, 19:00-23:00",
+      "wednesday": "12:00-15:00, 19:00-23:00",
+      "thursday": "12:00-15:00, 19:00-23:00",
+      "friday": "12:00-15:00, 19:00-23:00",
+      "saturday": "12:00-15:00, 19:00-23:00",
+      "sunday": "12:00-15:00, 19:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+39 06 687 5287",
+      "website": "https://www.roscioli.com",
+      "email": "info@roscioli.com"
+    },
+    "menu_items": [
+      "Carbonara - €18",
+      "Cacio e Pepe - €16",
+      "Amatriciana - €17",
+      "Saltimbocca - €22"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 60
+  },
+  {
+    "id": 4,
+    "name": "Trattoria da Enzo",
+    "port_id": 2,
+    "category": "Casual Dining",
+    "description": "Traditional Roman trattoria serving authentic local dishes in a cozy atmosphere.",
+    "cuisine_type": "Roman",
+    "latitude": 41.8902,
+    "longitude": 12.4922,
+    "rating": 4.5,
+    "price_range": "moderate",
+    "opening_hours": {
+      "monday": "12:00-15:00, 19:00-23:00",
+      "tuesday": "12:00-15:00, 19:00-23:00",
+      "wednesday": "12:00-15:00, 19:00-23:00",
+      "thursday": "12:00-15:00, 19:00-23:00",
+      "friday": "12:00-15:00, 19:00-23:00",
+      "saturday": "12:00-15:00, 19:00-23:00",
+      "sunday": "12:00-15:00, 19:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+39 06 686 5275",
+      "website": "https://www.trattoriadaenzo.it"
+    },
+    "menu_items": [
+      "Spaghetti alla Carbonara - €12",
+      "Saltimbocca alla Romana - €16",
+      "Artichokes alla Romana - €8",
+      "Tiramisu - €6"
+    ],
+    "dietary_options": ["vegetarian"],
+    "reservation_required": false,
+    "max_capacity": 40
+  },
+  {
+    "id": 5,
+    "name": "Varoulko Seaside",
+    "port_id": 3,
+    "category": "Fine Dining",
+    "description": "Michelin-starred seafood restaurant with stunning views of the Aegean Sea.",
+    "cuisine_type": "Greek Seafood",
+    "latitude": 37.9755,
+    "longitude": 23.7348,
+    "rating": 4.8,
+    "price_range": "expensive",
+    "opening_hours": {
+      "monday": "closed",
+      "tuesday": "19:00-23:00",
+      "wednesday": "19:00-23:00",
+      "thursday": "19:00-23:00",
+      "friday": "19:00-23:00",
+      "saturday": "19:00-23:00",
+      "sunday": "19:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+30 210 522 8400",
+      "website": "https://www.varoulko.gr",
+      "email": "info@varoulko.gr"
+    },
+    "menu_items": [
+      "Grilled Octopus - €24",
+      "Sea Bass with Herbs - €28",
+      "Lobster Pasta - €35",
+      "Greek Salad - €12"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 50
+  },
+  {
+    "id": 6,
+    "name": "Taverna Saita",
+    "port_id": 3,
+    "category": "Casual Dining",
+    "description": "Traditional Greek taverna serving authentic local dishes and fresh seafood.",
+    "cuisine_type": "Greek",
+    "latitude": 37.9755,
+    "longitude": 23.7348,
+    "rating": 4.4,
+    "price_range": "moderate",
+    "opening_hours": {
+      "monday": "12:00-24:00",
+      "tuesday": "12:00-24:00",
+      "wednesday": "12:00-24:00",
+      "thursday": "12:00-24:00",
+      "friday": "12:00-24:00",
+      "saturday": "12:00-24:00",
+      "sunday": "12:00-24:00"
+    },
+    "contact_info": {
+      "phone": "+30 210 321 3035",
+      "website": "https://www.saita.gr"
+    },
+    "menu_items": [
+      "Moussaka - €14",
+      "Grilled Lamb Chops - €18",
+      "Greek Salad - €8",
+      "Baklava - €5"
+    ],
+    "dietary_options": ["vegetarian"],
+    "reservation_required": false,
+    "max_capacity": 80
+  },
+  {
+    "id": 7,
+    "name": "Nusr-Et Steakhouse",
+    "port_id": 4,
+    "category": "Fine Dining",
+    "description": "World-famous steakhouse by Chef Nusret, known for theatrical salt bae presentation.",
+    "cuisine_type": "Turkish Steakhouse",
+    "latitude": 41.0082,
+    "longitude": 28.9784,
+    "rating": 4.6,
+    "price_range": "luxury",
+    "opening_hours": {
+      "monday": "12:00-24:00",
+      "tuesday": "12:00-24:00",
+      "wednesday": "12:00-24:00",
+      "thursday": "12:00-24:00",
+      "friday": "12:00-24:00",
+      "saturday": "12:00-24:00",
+      "sunday": "12:00-24:00"
+    },
+    "contact_info": {
+      "phone": "+90 212 236 2296",
+      "website": "https://www.nusr-et.com.tr",
+      "email": "istanbul@nusr-et.com.tr"
+    },
+    "menu_items": [
+      "Tomahawk Steak - €120",
+      "Wagyu Beef - €180",
+      "Turkish Meze - €25",
+      "Baklava - €15"
+    ],
+    "dietary_options": ["gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 100
+  },
+  {
+    "id": 8,
+    "name": "Café de Flore",
+    "port_id": 5,
+    "category": "Casual Dining",
+    "description": "Historic café in Nice's old town, famous for its Provençal cuisine and charming atmosphere.",
+    "cuisine_type": "French Provençal",
+    "latitude": 43.7102,
+    "longitude": 7.2620,
+    "rating": 4.2,
+    "price_range": "moderate",
+    "opening_hours": {
+      "monday": "08:00-22:00",
+      "tuesday": "08:00-22:00",
+      "wednesday": "08:00-22:00",
+      "thursday": "08:00-22:00",
+      "friday": "08:00-22:00",
+      "saturday": "08:00-22:00",
+      "sunday": "08:00-22:00"
+    },
+    "contact_info": {
+      "phone": "+33 4 93 62 39 24",
+      "website": "https://www.cafedeflore-nice.com"
+    },
+    "menu_items": [
+      "Bouillabaisse - €28",
+      "Ratatouille - €16",
+      "Nicoise Salad - €14",
+      "Crème Brûlée - €8"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": false,
+    "max_capacity": 60
+  },
+  {
+    "id": 9,
+    "name": "Osteria alle Testiere",
+    "port_id": 6,
+    "category": "Fine Dining",
+    "description": "Intimate Venetian restaurant specializing in fresh seafood and traditional Venetian cuisine.",
+    "cuisine_type": "Venetian",
+    "latitude": 45.4408,
+    "longitude": 12.3155,
+    "rating": 4.7,
+    "price_range": "expensive",
+    "opening_hours": {
+      "monday": "closed",
+      "tuesday": "12:00-14:00, 19:00-22:00",
+      "wednesday": "12:00-14:00, 19:00-22:00",
+      "thursday": "12:00-14:00, 19:00-22:00",
+      "friday": "12:00-14:00, 19:00-22:00",
+      "saturday": "12:00-14:00, 19:00-22:00",
+      "sunday": "closed"
+    },
+    "contact_info": {
+      "phone": "+39 041 522 7220",
+      "website": "https://www.osterialletestiere.it",
+      "email": "info@osterialletestiere.it"
+    },
+    "menu_items": [
+      "Spaghetti alle Vongole - €20",
+      "Risotto al Nero di Seppia - €22",
+      "Branzino al Sale - €25",
+      "Tiramisu - €8"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 25
+  },
+  {
+    "id": 10,
+    "name": "Nammos Mykonos",
+    "port_id": 7,
+    "category": "Fine Dining",
+    "description": "Luxury beachfront restaurant and beach club, famous for its seafood and party atmosphere.",
+    "cuisine_type": "Mediterranean",
+    "latitude": 37.4467,
+    "longitude": 25.3289,
+    "rating": 4.5,
+    "price_range": "luxury",
+    "opening_hours": {
+      "monday": "12:00-02:00",
+      "tuesday": "12:00-02:00",
+      "wednesday": "12:00-02:00",
+      "thursday": "12:00-02:00",
+      "friday": "12:00-02:00",
+      "saturday": "12:00-02:00",
+      "sunday": "12:00-02:00"
+    },
+    "contact_info": {
+      "phone": "+30 228 902 4800",
+      "website": "https://www.nammos.com",
+      "email": "mykonos@nammos.com"
+    },
+    "menu_items": [
+      "Grilled Lobster - €45",
+      "Greek Salad - €18",
+      "Tzatziki - €12",
+      "Champagne - €80"
+    ],
+    "dietary_options": ["vegetarian", "vegan", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 200
+  },
+  {
+    "id": 11,
+    "name": "Ambrosia Restaurant",
+    "port_id": 8,
+    "category": "Fine Dining",
+    "description": "Romantic cliffside restaurant with panoramic views of the Santorini caldera.",
+    "cuisine_type": "Greek Fine Dining",
+    "latitude": 36.3932,
+    "longitude": 25.4615,
+    "rating": 4.8,
+    "price_range": "expensive",
+    "opening_hours": {
+      "monday": "19:00-23:00",
+      "tuesday": "19:00-23:00",
+      "wednesday": "19:00-23:00",
+      "thursday": "19:00-23:00",
+      "friday": "19:00-23:00",
+      "saturday": "19:00-23:00",
+      "sunday": "19:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+30 228 602 3313",
+      "website": "https://www.ambrosia-restaurant.com",
+      "email": "info@ambrosia-restaurant.com"
+    },
+    "menu_items": [
+      "Grilled Octopus - €28",
+      "Lamb with Herbs - €32",
+      "Greek Wine Selection - €25",
+      "Santorini Sunset Cocktail - €18"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 40
+  },
+  {
+    "id": 12,
+    "name": "Restaurant 360",
+    "port_id": 9,
+    "category": "Fine Dining",
+    "description": "Upscale restaurant with panoramic views of Dubrovnik's old town and Adriatic Sea.",
+    "cuisine_type": "Croatian Modern",
+    "latitude": 42.6507,
+    "longitude": 18.0944,
+    "rating": 4.6,
+    "price_range": "expensive",
+    "opening_hours": {
+      "monday": "18:00-23:00",
+      "tuesday": "18:00-23:00",
+      "wednesday": "18:00-23:00",
+      "thursday": "18:00-23:00",
+      "friday": "18:00-23:00",
+      "saturday": "18:00-23:00",
+      "sunday": "18:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+385 20 322 222",
+      "website": "https://www.restaurant360.hr",
+      "email": "info@restaurant360.hr"
+    },
+    "menu_items": [
+      "Black Risotto - €24",
+      "Grilled Sea Bass - €28",
+      "Croatian Wine - €20",
+      "Lavender Ice Cream - €8"
+    ],
+    "dietary_options": ["vegetarian", "gluten_free"],
+    "reservation_required": true,
+    "max_capacity": 50
+  },
+  {
+    "id": 13,
+    "name": "Konoba Catovica Mlini",
+    "port_id": 10,
+    "category": "Casual Dining",
+    "description": "Traditional Montenegrin konoba (tavern) serving authentic local cuisine in a historic mill setting.",
+    "cuisine_type": "Montenegrin",
+    "latitude": 42.4247,
+    "longitude": 18.7712,
+    "rating": 4.4,
+    "price_range": "moderate",
+    "opening_hours": {
+      "monday": "12:00-23:00",
+      "tuesday": "12:00-23:00",
+      "wednesday": "12:00-23:00",
+      "thursday": "12:00-23:00",
+      "friday": "12:00-23:00",
+      "saturday": "12:00-23:00",
+      "sunday": "12:00-23:00"
+    },
+    "contact_info": {
+      "phone": "+382 32 325 177",
+      "website": "https://www.catovicamlini.com"
+    },
+    "menu_items": [
+      "Njeguški Steak - €18",
+      "Cevapi - €12",
+      "Montenegrin Salad - €8",
+      "Rakija - €5"
+    ],
+    "dietary_options": ["vegetarian"],
+    "reservation_required": false,
+    "max_capacity": 60
+  }
+]
