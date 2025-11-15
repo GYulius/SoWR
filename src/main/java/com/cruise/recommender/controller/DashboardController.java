@@ -53,12 +53,56 @@ public class DashboardController {
         
         log.info("Getting ships near port: lat={}, lng={}, radius={}", latitude, longitude, radius);
         
+        // First try to get ships from CruiseShip entities
         List<CruiseShip> ships = aisDataService.getShipsNearPort(latitude, longitude, radius);
         
         List<ShipTrackingResponse> responses = ships.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
         
+        // Also get recent AIS data from Elasticsearch for more accurate positions
+        try {
+            double latRange = radius / 60.0;
+            double lngRange = radius / (60.0 * Math.cos(Math.toRadians(latitude)));
+            java.time.LocalDateTime since = java.time.LocalDateTime.now().minusHours(1);
+            
+            List<com.cruise.recommender.repository.elasticsearch.AisDataDocument> aisData = 
+                aisDataService.findAisDataInArea(
+                    latitude - latRange,
+                    latitude + latRange,
+                    longitude - lngRange,
+                    longitude + lngRange,
+                    since
+                );
+            
+            // Convert AIS documents to ship responses
+            for (com.cruise.recommender.repository.elasticsearch.AisDataDocument doc : aisData) {
+                if (doc.getLatitude() != null && doc.getLongitude() != null) {
+                    // Check if we already have this ship in responses
+                    boolean exists = responses.stream()
+                        .anyMatch(r -> r.getShipName() != null && 
+                                     r.getShipName().equals(doc.getShipName()));
+                    
+                    if (!exists) {
+                        // Create response from AIS data
+                        ShipTrackingResponse aisResponse = ShipTrackingResponse.builder()
+                            .shipName(doc.getShipName())
+                            .latitude(doc.getLatitude())
+                            .longitude(doc.getLongitude())
+                            .speed(doc.getSpeed())
+                            .course(doc.getCourse())
+                            .trackingStatus("TRACKED")
+                            .lastUpdate(doc.getTimestamp())
+                            .build();
+                        responses.add(aisResponse);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error fetching AIS data for ships near port: {}", e.getMessage());
+        }
+        
+        log.info("Found {} ships near port", responses.size());
         return ResponseEntity.ok(responses);
     }
     

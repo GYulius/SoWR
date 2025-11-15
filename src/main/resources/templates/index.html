@@ -6,6 +6,10 @@
     <title>Social Web Recommender for Cruising Ports</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+         crossorigin=""/>
     <style>
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -28,6 +32,15 @@
         .stats-section {
             background-color: #f8f9fa;
             padding: 60px 0;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .port-selector {
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -221,6 +234,48 @@
                     <p class="lead">Explore our supported Mediterranean cruise ports</p>
                 </div>
             </div>
+            
+            <!-- Port Selector and Map -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row align-items-center port-selector">
+                                <div class="col-md-4">
+                                    <label for="portSelect" class="form-label fw-bold">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Select a Port:
+                                    </label>
+                                    <input type="text" id="portSearch" class="form-control mb-2" 
+                                           placeholder="Search ports..." 
+                                           onkeyup="filterPorts()">
+                                    <select id="portSelect" class="form-select form-select-lg" size="10" style="max-height: 300px;">
+                                        <option value="">-- Select a Port --</option>
+                                        <option th:each="port : ${featuredPorts}" 
+                                                th:value="${port.code != null && !port.code.isEmpty() ? port.code : 'N/A'}"
+                                                th:data-lat="${port.latitudeDecimal}"
+                                                th:data-lng="${port.longitudeDecimal}"
+                                                th:data-port-name="${port.port}"
+                                                th:data-country="${port.country}"
+                                                th:text="${port.port + (port.code != null && !port.code.isEmpty() ? ' (' + port.code + ')' : '') + ' - ' + (port.country != null ? port.country : 'Unknown')}">
+                                            Port Name
+                                        </option>
+                                    </select>
+                                    <small class="text-muted" id="portCount" th:text="'Total ports: ' + ${featuredPorts.size()}">Total ports: 0</small>
+                                </div>
+                                <div class="col-md-8">
+                                    <div id="portInfo" class="text-muted" style="display: none;">
+                                        <p class="mb-1"><strong id="portName"></strong></p>
+                                        <p class="mb-0"><small id="portDetails"></small></p>
+                                    </div>
+                                    <div id="map" style="height: 500px; width: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Port Cards -->
             <div class="row" th:if="${ports != null}">
                 <div class="col-md-6 col-lg-4" th:each="port : ${ports}">
                     <div class="card port-card">
@@ -309,5 +364,181 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+         crossorigin=""></script>
+    
+    <script>
+        // Initialize map (will be centered when port is selected)
+        let map = L.map('map').setView([41.3851, 2.1734], 6); // Default: Barcelona area
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        let portMarker = null;
+        let shipMarkers = [];
+        
+        // Port search filter function
+        function filterPorts() {
+            const searchTerm = document.getElementById('portSearch').value.toLowerCase();
+            const select = document.getElementById('portSelect');
+            const options = select.getElementsByTagName('option');
+            let visibleCount = 0;
+            
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const text = option.text.toLowerCase();
+                if (text.includes(searchTerm) || searchTerm === '') {
+                    option.style.display = '';
+                    visibleCount++;
+                } else {
+                    option.style.display = 'none';
+                }
+            }
+        }
+        
+        // Port selector change handler
+        document.getElementById('portSelect').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const portCode = this.value;
+            
+            if (!portCode || portCode === 'N/A' || portCode === '') {
+                // Reset map to default view
+                map.setView([41.3851, 2.1734], 6);
+                document.getElementById('portInfo').style.display = 'none';
+                clearMarkers();
+                return;
+            }
+            
+            const lat = parseFloat(selectedOption.dataset.lat);
+            const lng = parseFloat(selectedOption.dataset.lng);
+            const portName = selectedOption.dataset.portName || selectedOption.text;
+            const country = selectedOption.dataset.country || '';
+            
+            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                console.error('Invalid coordinates for port:', portCode, 'lat:', lat, 'lng:', lng);
+                alert('Invalid coordinates for selected port. Please select another port.');
+                return;
+            }
+            
+            // Update port info
+            document.getElementById('portName').textContent = portName + (country ? ' - ' + country : '');
+            document.getElementById('portDetails').textContent = 
+                `Latitude: ${lat.toFixed(4)}, Longitude: ${lng.toFixed(4)}`;
+            document.getElementById('portInfo').style.display = 'block';
+            
+            // Center map on port
+            map.setView([lat, lng], 12);
+            
+            // Clear existing markers
+            clearMarkers();
+            
+            // Add port marker
+            portMarker = L.marker([lat, lng])
+                .addTo(map)
+                .bindPopup(`<b>${portName}</b><br>Port Code: ${portCode}${country ? '<br>Country: ' + country : ''}`)
+                .openPopup();
+            
+            // Fetch ships near this port
+            loadShipsNearPort(lat, lng);
+        });
+        
+        function clearMarkers() {
+            if (portMarker) {
+                map.removeLayer(portMarker);
+                portMarker = null;
+            }
+            shipMarkers.forEach(marker => map.removeLayer(marker));
+            shipMarkers = [];
+        }
+        
+        function loadShipsNearPort(lat, lng) {
+            console.log('Loading ships near port:', lat, lng);
+            
+            // Call API to get ships near port (50 nautical miles radius)
+            // Note: Adjust the path based on your server context-path configuration
+            fetch(`/api/v1/dashboard/ships/near-port?latitude=${lat}&longitude=${lng}&radius=50`)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error('Error response:', text);
+                            throw new Error('Failed to fetch ships: ' + response.status + ' - ' + text);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(ships => {
+                    console.log('Loaded ships:', ships);
+                    console.log('Number of ships:', ships.length);
+                    
+                    if (!Array.isArray(ships)) {
+                        console.error('Invalid ships data:', ships);
+                        return;
+                    }
+                    
+                    let shipsAdded = 0;
+                    ships.forEach(ship => {
+                        if (ship && ship.latitude != null && ship.longitude != null && 
+                            !isNaN(ship.latitude) && !isNaN(ship.longitude)) {
+                            const shipIcon = L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34]
+                            });
+                            
+                            const marker = L.marker([ship.latitude, ship.longitude], {icon: shipIcon})
+                                .addTo(map)
+                                .bindPopup(`
+                                    <b>${ship.shipName || 'Unknown Ship'}</b><br>
+                                    ${ship.cruiseLine ? 'Cruise Line: ' + ship.cruiseLine + '<br>' : ''}
+                                    Speed: ${ship.speed != null ? ship.speed.toFixed(1) + ' knots' : 'N/A'}<br>
+                                    Course: ${ship.course != null ? ship.course.toFixed(1) + '°' : 'N/A'}<br>
+                                    Status: ${ship.trackingStatus || 'Unknown'}<br>
+                                    ${ship.lastUpdate ? 'Last Update: ' + new Date(ship.lastUpdate).toLocaleString() : ''}
+                                `);
+                            
+                            shipMarkers.push(marker);
+                            shipsAdded++;
+                        } else {
+                            console.warn('Skipping ship with invalid coordinates:', ship);
+                        }
+                    });
+                    
+                    console.log('Added', shipsAdded, 'ship markers to map');
+                    
+                    if (shipsAdded === 0) {
+                        // Show info if no ships found
+                        L.popup()
+                            .setLatLng([lat, lng])
+                            .setContent('No ships currently tracked near this port')
+                            .openOn(map);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading ships:', error);
+                    // Show error message
+                    L.popup()
+                        .setLatLng([lat, lng])
+                        .setContent('Error loading ship data: ' + error.message)
+                        .openOn(map);
+                });
+        }
+        
+        // Initialize: if there are featured ports, select the first one
+        window.addEventListener('DOMContentLoaded', function() {
+            const portSelect = document.getElementById('portSelect');
+            if (portSelect.options.length > 1) {
+                // Optionally auto-select first port
+                // portSelect.selectedIndex = 1;
+                // portSelect.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
 </body>
 </html>

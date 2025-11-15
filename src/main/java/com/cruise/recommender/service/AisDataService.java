@@ -269,6 +269,7 @@ public class AisDataService {
     
     /**
      * Get ships within range of a port
+     * Uses both CruiseShip entities and recent AIS data from Elasticsearch
      */
     @Transactional(readOnly = true)
     public List<CruiseShip> getShipsNearPort(Double portLatitude, Double portLongitude, Double radiusNauticalMiles) {
@@ -276,12 +277,51 @@ public class AisDataService {
         double latRange = radiusNauticalMiles / 60.0; // 1 nautical mile ≈ 1/60 degree latitude
         double lngRange = radiusNauticalMiles / (60.0 * Math.cos(Math.toRadians(portLatitude)));
         
-        return cruiseShipRepository.findShipsInArea(
+        List<CruiseShip> ships = cruiseShipRepository.findShipsInArea(
                 portLatitude - latRange,
                 portLatitude + latRange,
                 portLongitude - lngRange,
                 portLongitude + lngRange
         );
+        
+        // Also check recent AIS data from Elasticsearch (last hour) for more accurate positions
+        if (aisDataElasticsearchRepository != null) {
+            try {
+                LocalDateTime since = LocalDateTime.now().minusHours(1);
+                List<AisDataDocument> recentAisData = aisDataElasticsearchRepository
+                    .findByLatitudeBetweenAndLongitudeBetweenAndTimestampGreaterThanEqual(
+                        portLatitude - latRange,
+                        portLatitude + latRange,
+                        portLongitude - lngRange,
+                        portLongitude + lngRange,
+                        since
+                    );
+                
+                // Update ship positions from recent AIS data
+                for (AisDataDocument aisDoc : recentAisData) {
+                    if (aisDoc.getCruiseShipId() != null) {
+                        Optional<CruiseShip> shipOpt = cruiseShipRepository.findById(aisDoc.getCruiseShipId());
+                        if (shipOpt.isPresent()) {
+                            CruiseShip ship = shipOpt.get();
+                            // Update position if AIS data is more recent
+                            if (ship.getLastAisUpdate() == null || 
+                                (aisDoc.getTimestamp() != null && 
+                                 aisDoc.getTimestamp().isAfter(ship.getLastAisUpdate()))) {
+                                ship.setCurrentLatitude(aisDoc.getLatitude());
+                                ship.setCurrentLongitude(aisDoc.getLongitude());
+                                ship.setCurrentSpeed(aisDoc.getSpeed());
+                                ship.setCurrentCourse(aisDoc.getCourse());
+                                // Don't save here - just update in memory for response
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error fetching AIS data from Elasticsearch: {}", e.getMessage());
+            }
+        }
+        
+        return ships;
     }
     
     /**
