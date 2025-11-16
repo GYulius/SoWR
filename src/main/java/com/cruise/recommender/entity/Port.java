@@ -38,6 +38,8 @@ public class Port {
     @Column(nullable = false)
     private String country;
     
+    private String geo;
+    
     private String region;
     
     @Column(nullable = false)
@@ -67,6 +69,15 @@ public class Port {
     private String timezone;
     
     private String language;
+    
+    @Column(name = "tourism1")
+    private String tourism1;
+    
+    @Column(name = "foodie_main", columnDefinition = "JSON")
+    private String foodieMain;
+    
+    @Column(name = "foodie_dessert", columnDefinition = "JSON")
+    private String foodieDessert;
     
     @CreatedDate
     @Column(name = "created_at")

@@ -30,29 +30,35 @@ CREATE TABLE users (
 );
 
 -- Ports table (imported from ports_A.json)
+-- Using BIGINT for id to match JPA entity (Long type)
 CREATE TABLE ports (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    port_code VARCHAR(10) UNIQUE NOT NULL,
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    port_code VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     country VARCHAR(100) NOT NULL,
+    geo VARCHAR(100),
     region VARCHAR(100),
     city VARCHAR(100) NOT NULL,
     latitude DECIMAL(10, 8) NOT NULL,
     longitude DECIMAL(11, 8) NOT NULL,
-    coordinates POINT AS (POINT(longitude, latitude)) STORED,
+    coordinates POINT SRID 4326 NOT NULL,
     capacity INT NOT NULL DEFAULT 0,
     facilities JSON,
     amenities JSON,
     docking_fees DECIMAL(10, 2),
     currency VARCHAR(3) DEFAULT 'USD',
     timezone VARCHAR(50),
-    language VARCHAR(100),
+    language VARCHAR(200),
+    tourism1 VARCHAR(500),
+    foodie_main JSON,
+    foodie_dessert JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_country (country),
-    INDEX idx_coordinates (coordinates),
+    INDEX idx_geo (geo),
+    INDEX idx_port_code (port_code),
     SPATIAL INDEX idx_spatial_coords (coordinates)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Categories for attractions, restaurants, etc.
 CREATE TABLE categories (
