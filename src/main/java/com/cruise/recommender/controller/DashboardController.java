@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/dashboard")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Dashboard", description = "Ship tracking and analytics dashboard APIs")
