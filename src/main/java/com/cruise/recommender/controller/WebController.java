@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.List;
@@ -65,18 +67,54 @@ public class WebController {
     }
     
     /**
-     * API endpoint to get all ports for dropdown
+     * API endpoint to get all ports for dropdown (from database)
+     * Accessible at /api/v1/ports (context path + mapping)
      */
-    @GetMapping("/api/ports")
+    @GetMapping("/ports")
     @ResponseBody
-    public List<PortDataService.PortData> getAllPorts() {
-        return portDataService.getAllPorts();
+    @CrossOrigin(origins = "*")
+    public List<Port> getAllPorts() {
+        log.info("=== GET /ports endpoint called ===");
+        log.info("Fetching all ports from database");
+        try {
+            List<Port> ports = portRepository.findAll();
+            log.info("Found {} ports in database", ports.size());
+            if (!ports.isEmpty()) {
+                log.info("First port sample: id={}, name={}, portCode={}, lat={}, lng={}", 
+                        ports.get(0).getId(), ports.get(0).getName(), 
+                        ports.get(0).getPortCode(), ports.get(0).getLatitude(), 
+                        ports.get(0).getLongitude());
+            } else {
+                log.warn("No ports found in database! Check if data was inserted.");
+            }
+            log.info("=== Returning {} ports ===", ports.size());
+            return ports;
+        } catch (Exception e) {
+            log.error("Error fetching ports from database", e);
+            throw e;
+        }
     }
     
     /**
-     * API endpoint to get featured ports
+     * API endpoint to get a single port by ID (for Foodie section)
+     * Accessible at /api/v1/ports/{id} (context path + mapping)
      */
-    @GetMapping("/api/ports/featured")
+    @GetMapping("/ports/{id}")
+    @ResponseBody
+    @CrossOrigin(origins = "*")
+    public Port getPortById(@PathVariable Long id) {
+        log.info("Fetching port with id: {}", id);
+        Port port = portRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Port not found with id: " + id));
+        log.debug("Found port: id={}, name={}, portCode={}", port.getId(), port.getName(), port.getPortCode());
+        return port;
+    }
+    
+    /**
+     * API endpoint to get featured ports (from JSON for backward compatibility)
+     * Accessible at /api/v1/ports/featured (context path + mapping)
+     */
+    @GetMapping("/ports/featured")
     @ResponseBody
     public List<PortDataService.PortData> getFeaturedPorts() {
         return portDataService.getFeaturedPorts();

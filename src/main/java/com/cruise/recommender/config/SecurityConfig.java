@@ -28,8 +28,8 @@ public class SecurityConfig {
                 .anyRequest().permitAll() // Temporarily permit all - update when auth is implemented
             )
             .csrf(csrf -> csrf
-                // Disable CSRF for actuator endpoints
-                .ignoringRequestMatchers("/actuator/**")
+                // Disable CSRF for actuator endpoints and API endpoints
+                .ignoringRequestMatchers("/actuator/**", "/ports/**", "/dashboard/**", "/passengers/**", "/recommendations/**", "/publishers/**")
             );
         
         return http.build();

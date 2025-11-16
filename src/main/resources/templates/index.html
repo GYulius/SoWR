@@ -64,6 +64,9 @@
                         <a class="nav-link" href="#ports">Ports</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#foodie">Foodie</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/swagger-ui.html" target="_blank">API Docs</a>
                     </li>
                     <li class="nav-item">
@@ -99,6 +102,122 @@
                 <a href="/swagger-ui.html" class="btn btn-outline-light btn-lg" target="_blank">
                     <i class="fas fa-code me-2"></i>API Documentation
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ports Section - Moved right after Hero -->
+    <section id="ports" class="py-5">
+        <div class="container">
+            <div class="row text-center mb-5">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold">Featured Ports</h2>
+                    <p class="lead">Explore our supported cruise ports</p>
+                </div>
+            </div>
+            
+            <!-- Port Selector and Map -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row align-items-center port-selector">
+                                <div class="col-md-4">
+                                    <label for="portSelect" class="form-label fw-bold">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Select a Port:
+                                    </label>
+                                    <input type="text" id="portSearch" class="form-control mb-2" 
+                                           placeholder="Search ports..." 
+                                           onkeyup="filterPorts()">
+                                    <select id="portSelect" class="form-select form-select-lg" size="10" style="max-height: 300px;">
+                                        <option value="">-- Select a Port --</option>
+                                        <!-- Ports will be loaded dynamically from database -->
+                                    </select>
+                                    <small class="text-muted" id="portCount">Total ports: 0</small>
+                                </div>
+                                <div class="col-md-8">
+                                    <div id="portInfo" class="text-muted" style="display: none;">
+                                        <p class="mb-1"><strong id="portName"></strong></p>
+                                        <p class="mb-0"><small id="portDetails"></small></p>
+                                    </div>
+                                    <div id="map" style="height: 500px; width: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Port Cards -->
+            <div class="row" id="portCardsContainer">
+                <div class="col-12 text-center">
+                    <p class="text-muted">Select a port to view details</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Foodie Section -->
+    <section id="foodie" class="py-5 bg-light">
+        <div class="container">
+            <div class="row text-center mb-5">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold">
+                        <i class="fas fa-utensils me-3"></i>Foodie Delights
+                    </h2>
+                    <p class="lead">Discover local culinary specialties at each port</p>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <label for="foodiePortSelect" class="form-label fw-bold">
+                                <i class="fas fa-map-marker-alt me-2"></i>Select a Port to View Foodie Information:
+                            </label>
+                            <select id="foodiePortSelect" class="form-select form-select-lg">
+                                <option value="">-- Select a Port --</option>
+                                <!-- Ports will be loaded dynamically from database -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="foodieContent" style="display: none;">
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-drumstick-bite me-2"></i>Main Dish
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <h4 id="foodieMainName" class="text-primary mb-3"></h4>
+                                <p id="foodieMainRecipe" class="card-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-birthday-cake me-2"></i>Dessert
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <h4 id="foodieDessertName" class="text-warning mb-3"></h4>
+                                <p id="foodieDessertRecipe" class="card-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="foodieNoData" class="text-center text-muted" style="display: none;">
+                <p><i class="fas fa-info-circle me-2"></i>No foodie information available for the selected port.</p>
             </div>
         </div>
     </section>
@@ -197,8 +316,8 @@
                     <div class="mb-3">
                         <i class="fas fa-map-marker-alt fa-3x text-primary"></i>
                     </div>
-                    <h3 class="fw-bold">10+</h3>
-                    <p class="text-muted">Mediterranean Ports</p>
+                    <h3 class="fw-bold" id="statsPorts">400+</h3>
+                    <p class="text-muted">Cruise Ports</p>
                 </div>
                 <div class="col-md-3">
                     <div class="mb-3">
@@ -220,86 +339,6 @@
                     </div>
                     <h3 class="fw-bold">24/7</h3>
                     <p class="text-muted">Real-time Updates</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Ports Section -->
-    <section id="ports" class="py-5">
-        <div class="container">
-            <div class="row text-center mb-5">
-                <div class="col-12">
-                    <h2 class="display-5 fw-bold">Featured Ports</h2>
-                    <p class="lead">Explore our supported Mediterranean cruise ports</p>
-                </div>
-            </div>
-            
-            <!-- Port Selector and Map -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="row align-items-center port-selector">
-                                <div class="col-md-4">
-                                    <label for="portSelect" class="form-label fw-bold">
-                                        <i class="fas fa-map-marker-alt me-2"></i>Select a Port:
-                                    </label>
-                                    <input type="text" id="portSearch" class="form-control mb-2" 
-                                           placeholder="Search ports..." 
-                                           onkeyup="filterPorts()">
-                                    <select id="portSelect" class="form-select form-select-lg" size="10" style="max-height: 300px;">
-                                        <option value="">-- Select a Port --</option>
-                                        <option th:each="port : ${featuredPorts}" 
-                                                th:value="${port.code != null && !port.code.isEmpty() ? port.code : 'N/A'}"
-                                                th:data-lat="${port.latitudeDecimal}"
-                                                th:data-lng="${port.longitudeDecimal}"
-                                                th:data-port-name="${port.port}"
-                                                th:data-country="${port.country}"
-                                                th:text="${port.port + (port.code != null && !port.code.isEmpty() ? ' (' + port.code + ')' : '') + ' - ' + (port.country != null ? port.country : 'Unknown')}">
-                                            Port Name
-                                        </option>
-                                    </select>
-                                    <small class="text-muted" id="portCount" th:text="'Total ports: ' + ${featuredPorts.size()}">Total ports: 0</small>
-                                </div>
-                                <div class="col-md-8">
-                                    <div id="portInfo" class="text-muted" style="display: none;">
-                                        <p class="mb-1"><strong id="portName"></strong></p>
-                                        <p class="mb-0"><small id="portDetails"></small></p>
-                                    </div>
-                                    <div id="map" style="height: 500px; width: 100%;"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Port Cards -->
-            <div class="row" th:if="${ports != null}">
-                <div class="col-md-6 col-lg-4" th:each="port : ${ports}">
-                    <div class="card port-card">
-                        <div class="card-body">
-                            <h5 class="card-title" th:text="${port.name}">Port Name</h5>
-                            <p class="card-text">
-                                <i class="fas fa-map-marker-alt me-2"></i>
-                                <span th:text="${port.city + ', ' + port.country}">City, Country</span>
-                            </p>
-                            <p class="card-text">
-                                <i class="fas fa-users me-2"></i>
-                                <span th:text="'Capacity: ' + ${port.capacity}">Capacity</span>
-                            </p>
-                            <p class="card-text">
-                                <i class="fas fa-anchor me-2"></i>
-                                <span th:text="'Code: ' + ${port.portCode}">Port Code</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="row" th:if="${ports == null}">
-                <div class="col-12 text-center">
-                    <p class="text-muted">Loading ports data...</p>
                 </div>
             </div>
         </div>
@@ -381,6 +420,104 @@
         
         let portMarker = null;
         let shipMarkers = [];
+        let allPorts = []; // Store all ports from database
+        
+        // Get base path dynamically (handles context path and different servers)
+        function getBasePath() {
+            // If accessing through Spring Boot server (port 8080), use context path
+            if (window.location.port === '8080' || window.location.hostname === 'localhost' && window.location.port === '') {
+                const path = window.location.pathname;
+                if (path.startsWith('/api/v1')) {
+                    return '/api/v1';
+                }
+                return '/api/v1'; // Default to context path for Spring Boot
+            }
+            // If accessing through IntelliJ web server or other, use full Spring Boot URL
+            return 'http://localhost:8080/api/v1';
+        }
+        
+        // Load ports from database API
+        function loadPortsFromDatabase() {
+            const basePath = getBasePath();
+            const apiUrl = `${basePath}/ports`;
+            console.log('Loading ports from', apiUrl, '...');
+            console.log('Current page path:', window.location.pathname);
+            fetch(apiUrl)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error('Error response:', text);
+                            throw new Error(`HTTP ${response.status}: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(ports => {
+                    console.log('Loaded', ports.length, 'ports from database');
+                    console.log('First port sample:', ports[0]);
+                    
+                    if (!Array.isArray(ports)) {
+                        console.error('Invalid ports data - not an array:', ports);
+                        document.getElementById('portCount').textContent = 'Error: Invalid data format';
+                        return;
+                    }
+                    
+                    allPorts = ports;
+                    
+                    // Update stats
+                    document.getElementById('statsPorts').textContent = ports.length + '+';
+                    
+                    // Populate port dropdown
+                    const portSelect = document.getElementById('portSelect');
+                    const foodiePortSelect = document.getElementById('foodiePortSelect');
+                    
+                    // Clear existing options (except first one)
+                    portSelect.innerHTML = '<option value="">-- Select a Port --</option>';
+                    foodiePortSelect.innerHTML = '<option value="">-- Select a Port --</option>';
+                    
+                    let portsAdded = 0;
+                    ports.forEach(port => {
+                        if (port && port.latitude != null && port.longitude != null && 
+                            !isNaN(port.latitude) && !isNaN(port.longitude) &&
+                            port.latitude !== 0 && port.longitude !== 0) {
+                            const option = document.createElement('option');
+                            option.value = port.id;
+                            option.textContent = `${port.name || 'Unknown'} (${port.portCode || 'N/A'}) - ${port.country || 'Unknown'}`;
+                            option.dataset.lat = port.latitude;
+                            option.dataset.lng = port.longitude;
+                            option.dataset.portName = port.name || 'Unknown';
+                            option.dataset.country = port.country || '';
+                            option.dataset.city = port.city || '';
+                            option.dataset.capacity = port.capacity || 0;
+                            portSelect.appendChild(option);
+                            
+                            // Also add to foodie dropdown
+                            const foodieOption = option.cloneNode(true);
+                            foodiePortSelect.appendChild(foodieOption);
+                            portsAdded++;
+                        } else {
+                            console.warn('Skipping port with invalid coordinates:', port);
+                        }
+                    });
+                    
+                    document.getElementById('portCount').textContent = `Total ports: ${portsAdded} (${ports.length} total)`;
+                    
+                    if (portsAdded === 0) {
+                        document.getElementById('portCount').textContent = 'No ports with valid coordinates found';
+                        console.warn('No ports with valid coordinates found');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading ports:', error);
+                    document.getElementById('portCount').textContent = 'Error loading ports: ' + error.message;
+                    // Show user-friendly error message
+                    const portSelect = document.getElementById('portSelect');
+                    const foodiePortSelect = document.getElementById('foodiePortSelect');
+                    portSelect.innerHTML = '<option value="">Error loading ports. Please refresh the page.</option>';
+                    foodiePortSelect.innerHTML = '<option value="">Error loading ports. Please refresh the page.</option>';
+                });
+        }
         
         // Port search filter function
         function filterPorts() {
@@ -391,6 +528,12 @@
             
             for (let i = 0; i < options.length; i++) {
                 const option = options[i];
+                // Always show the first option (placeholder)
+                if (option.value === '') {
+                    option.style.display = '';
+                    continue;
+                }
+                
                 const text = option.text.toLowerCase();
                 if (text.includes(searchTerm) || searchTerm === '') {
                     option.style.display = '';
@@ -399,17 +542,24 @@
                     option.style.display = 'none';
                 }
             }
+            
+            // Update count display
+            if (searchTerm) {
+                document.getElementById('portCount').textContent = `${visibleCount} port(s) match "${searchTerm}"`;
+            }
         }
         
         // Port selector change handler
         document.getElementById('portSelect').addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
-            const portCode = this.value;
+            const portId = this.value;
             
-            if (!portCode || portCode === 'N/A' || portCode === '') {
+            if (!portId || portId === '') {
                 // Reset map to default view
                 map.setView([41.3851, 2.1734], 6);
                 document.getElementById('portInfo').style.display = 'none';
+                document.getElementById('portCardsContainer').innerHTML = 
+                    '<div class="col-12 text-center"><p class="text-muted">Select a port to view details</p></div>';
                 clearMarkers();
                 return;
             }
@@ -418,9 +568,11 @@
             const lng = parseFloat(selectedOption.dataset.lng);
             const portName = selectedOption.dataset.portName || selectedOption.text;
             const country = selectedOption.dataset.country || '';
+            const city = selectedOption.dataset.city || '';
+            const capacity = selectedOption.dataset.capacity || 0;
             
             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-                console.error('Invalid coordinates for port:', portCode, 'lat:', lat, 'lng:', lng);
+                console.error('Invalid coordinates for port:', portId, 'lat:', lat, 'lng:', lng);
                 alert('Invalid coordinates for selected port. Please select another port.');
                 return;
             }
@@ -428,8 +580,35 @@
             // Update port info
             document.getElementById('portName').textContent = portName + (country ? ' - ' + country : '');
             document.getElementById('portDetails').textContent = 
-                `Latitude: ${lat.toFixed(4)}, Longitude: ${lng.toFixed(4)}`;
+                `${city ? city + ', ' : ''}${country} | Capacity: ${capacity} | Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
             document.getElementById('portInfo').style.display = 'block';
+            
+            // Update port card
+            const port = allPorts.find(p => p.id == portId);
+            if (port) {
+                document.getElementById('portCardsContainer').innerHTML = `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card port-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${port.name}</h5>
+                                <p class="card-text">
+                                    <i class="fas fa-map-marker-alt me-2"></i>
+                                    <span>${port.city || ''}, ${port.country || ''}</span>
+                                </p>
+                                <p class="card-text">
+                                    <i class="fas fa-users me-2"></i>
+                                    <span>Capacity: ${port.capacity || 0}</span>
+                                </p>
+                                <p class="card-text">
+                                    <i class="fas fa-anchor me-2"></i>
+                                    <span>Code: ${port.portCode || 'N/A'}</span>
+                                </p>
+                                ${port.tourism1 ? `<p class="card-text"><i class="fas fa-camera me-2"></i><span>${port.tourism1}</span></p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             
             // Center map on port
             map.setView([lat, lng], 12);
@@ -440,11 +619,80 @@
             // Add port marker
             portMarker = L.marker([lat, lng])
                 .addTo(map)
-                .bindPopup(`<b>${portName}</b><br>Port Code: ${portCode}${country ? '<br>Country: ' + country : ''}`)
+                .bindPopup(`<b>${portName}</b><br>Port Code: ${selectedOption.text.split('(')[1]?.split(')')[0] || 'N/A'}${country ? '<br>Country: ' + country : ''}`)
                 .openPopup();
             
             // Fetch ships near this port
             loadShipsNearPort(lat, lng);
+        });
+        
+        // Foodie port selector change handler
+        document.getElementById('foodiePortSelect').addEventListener('change', function() {
+            const portId = this.value;
+            
+            if (!portId || portId === '') {
+                document.getElementById('foodieContent').style.display = 'none';
+                document.getElementById('foodieNoData').style.display = 'none';
+                return;
+            }
+            
+            // Fetch port details
+            const basePath = getBasePath();
+            fetch(`${basePath}/ports/${portId}`)
+                .then(response => response.json())
+                .then(port => {
+                    const hasFoodieData = port.foodieMain || port.foodieDessert;
+                    
+                    if (!hasFoodieData) {
+                        document.getElementById('foodieContent').style.display = 'none';
+                        document.getElementById('foodieNoData').style.display = 'block';
+                        return;
+                    }
+                    
+                    document.getElementById('foodieNoData').style.display = 'none';
+                    document.getElementById('foodieContent').style.display = 'block';
+                    
+                    // Parse and display foodie_main
+                    if (port.foodieMain) {
+                        try {
+                            const foodieMain = typeof port.foodieMain === 'string' 
+                                ? JSON.parse(port.foodieMain) 
+                                : port.foodieMain;
+                            document.getElementById('foodieMainName').textContent = foodieMain.name || 'N/A';
+                            document.getElementById('foodieMainRecipe').textContent = foodieMain.recipe || 'No recipe available';
+                        } catch (e) {
+                            console.error('Error parsing foodieMain:', e);
+                            document.getElementById('foodieMainName').textContent = 'N/A';
+                            document.getElementById('foodieMainRecipe').textContent = 'Error loading recipe';
+                        }
+                    } else {
+                        document.getElementById('foodieMainName').textContent = 'N/A';
+                        document.getElementById('foodieMainRecipe').textContent = 'No main dish information available';
+                    }
+                    
+                    // Parse and display foodie_dessert
+                    if (port.foodieDessert) {
+                        try {
+                            const foodieDessert = typeof port.foodieDessert === 'string' 
+                                ? JSON.parse(port.foodieDessert) 
+                                : port.foodieDessert;
+                            document.getElementById('foodieDessertName').textContent = foodieDessert.name || 'N/A';
+                            document.getElementById('foodieDessertRecipe').textContent = foodieDessert.recipe || 'No recipe available';
+                        } catch (e) {
+                            console.error('Error parsing foodieDessert:', e);
+                            document.getElementById('foodieDessertName').textContent = 'N/A';
+                            document.getElementById('foodieDessertRecipe').textContent = 'Error loading recipe';
+                        }
+                    } else {
+                        document.getElementById('foodieDessertName').textContent = 'N/A';
+                        document.getElementById('foodieDessertRecipe').textContent = 'No dessert information available';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading port foodie data:', error);
+                    document.getElementById('foodieContent').style.display = 'none';
+                    document.getElementById('foodieNoData').style.display = 'block';
+                });
         });
         
         function clearMarkers() {
@@ -460,8 +708,8 @@
             console.log('Loading ships near port:', lat, lng);
             
             // Call API to get ships near port (50 nautical miles radius)
-            // Note: Adjust the path based on your server context-path configuration
-            fetch(`/api/v1/dashboard/ships/near-port?latitude=${lat}&longitude=${lng}&radius=50`)
+            const basePath = getBasePath();
+            fetch(`${basePath}/dashboard/ships/near-port?latitude=${lat}&longitude=${lng}&radius=50`)
                 .then(response => {
                     console.log('Response status:', response.status);
                     if (!response.ok) {
@@ -530,14 +778,9 @@
                 });
         }
         
-        // Initialize: if there are featured ports, select the first one
+        // Initialize: Load ports from database when page loads
         window.addEventListener('DOMContentLoaded', function() {
-            const portSelect = document.getElementById('portSelect');
-            if (portSelect.options.length > 1) {
-                // Optionally auto-select first port
-                // portSelect.selectedIndex = 1;
-                // portSelect.dispatchEvent(new Event('change'));
-            }
+            loadPortsFromDatabase();
         });
     </script>
 </body>
