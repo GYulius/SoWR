@@ -25,6 +25,11 @@ public class WebController {
     private final PortRepository portRepository;
     private final PortDataService portDataService;
     
+    @GetMapping("/login")
+    public String login() {
+        return "login";
+    }
+    
     @GetMapping("/")
     public String index(Model model) {
         log.info("Serving main application page");

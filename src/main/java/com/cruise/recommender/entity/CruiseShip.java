@@ -1,5 +1,6 @@
 package com.cruise.recommender.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -89,10 +90,12 @@ public class CruiseShip {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Relationships
+    // Relationships - Ignored in JSON serialization to avoid lazy loading issues
+    @JsonIgnore
     @OneToMany(mappedBy = "cruiseShip", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<AisData> aisDataHistory;
     
+    @JsonIgnore
     @OneToMany(mappedBy = "ship", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<CruiseSchedule> schedules;
     

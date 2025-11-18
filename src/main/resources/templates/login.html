@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Cruise Recommender</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header i {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-ship"></i>
+                <h2>Login</h2>
+                <p class="text-muted">Cruise Recommender</p>
+            </div>
+            
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                        <input type="email" class="form-control" id="email" required>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-sign-in-alt me-2"></i>Login
+                </button>
+            </form>
+            
+            <hr class="my-4">
+            
+            <div class="text-center">
+                <p class="text-muted mb-2">Don't have an account?</p>
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="showRegisterForm()">
+                    <i class="fas fa-user-plus me-2"></i>Register New User
+                </button>
+            </div>
+            
+            <!-- Registration Form (initially hidden) -->
+            <div id="registerForm" style="display: none; margin-top: 20px;">
+                <hr>
+                <h5 class="mb-3">Register New User</h5>
+                <div id="registerErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                <div id="registerSuccessMessage" class="alert alert-success" style="display: none;"></div>
+                
+                <form id="registerFormFields">
+                    <div class="mb-3">
+                        <label for="regFirstName" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="regFirstName" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="regLastName" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="regLastName" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="regEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="regEmail" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="regPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="regPassword" required minlength="6">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="regRole" class="form-label">Role</label>
+                        <select class="form-select" id="regRole">
+                            <option value="USER">User</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                        <small class="form-text text-muted">Note: Admin role grants access to maintenance panel</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-user-plus me-2"></i>Register
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="hideRegisterForm()">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function getBasePath() {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            if (port === '63342' || port === '') {
+                return 'http://localhost:8080/api/v1';
+            }
+            return '';
+        }
+        
+        function showRegisterForm() {
+            document.getElementById('registerForm').style.display = 'block';
+            document.getElementById('loginForm').style.display = 'none';
+        }
+        
+        function hideRegisterForm() {
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerFormFields').reset();
+            document.getElementById('registerErrorMessage').style.display = 'none';
+            document.getElementById('registerSuccessMessage').style.display = 'none';
+        }
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${getBasePath()}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Store token in localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data));
+                    
+                    // Set cookie manually as fallback (cookie from server might not work cross-origin)
+                    // Set cookie for Spring Boot domain
+                    document.cookie = `token=${data.token}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                    document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                    
+                    // Redirect based on role
+                    if (data.role === 'ADMIN') {
+                        // Redirect to Spring Boot server admin page
+                        // If served from IntelliJ (port 63342), use full URL to Spring Boot (port 8080)
+                        const currentPort = window.location.port;
+                        if (currentPort === '63342' || currentPort === '') {
+                            // Add token as query parameter as fallback for cookie issues
+                            window.location.href = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                        } else {
+                            window.location.href = '/admin/maintenance';
+                        }
+                    } else {
+                        // Regular users go to main page
+                        const currentPort = window.location.port;
+                        if (currentPort === '63342' || currentPort === '') {
+                            window.location.href = 'http://localhost:8080/api/v1/';
+                        } else {
+                            window.location.href = '/';
+                        }
+                    }
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Invalid email or password';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Login failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        
+        document.getElementById('registerFormFields').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const registerData = {
+                firstName: document.getElementById('regFirstName').value,
+                lastName: document.getElementById('regLastName').value,
+                email: document.getElementById('regEmail').value,
+                password: document.getElementById('regPassword').value,
+                role: document.getElementById('regRole').value
+            };
+            
+            const errorDiv = document.getElementById('registerErrorMessage');
+            const successDiv = document.getElementById('registerSuccessMessage');
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${getBasePath()}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    successDiv.textContent = `User registered successfully! Role: ${data.role}. You can now login.`;
+                    successDiv.style.display = 'block';
+                    
+                    // Auto-fill login form
+                    document.getElementById('email').value = registerData.email;
+                    
+                    // Hide register form after 2 seconds
+                    setTimeout(() => {
+                        hideRegisterForm();
+                    }, 2000);
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Registration failed. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Registration failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+

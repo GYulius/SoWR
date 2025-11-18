@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance - Cruise Recommender Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background-color: #343a40;
+            color: white;
+            padding: 20px 0;
+            position: fixed;
+            width: 250px;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            display: block;
+            transition: background-color 0.3s;
+        }
+        .sidebar a:hover {
+            background-color: #495057;
+        }
+        .sidebar a.active {
+            background-color: #667eea;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        .table-actions {
+            white-space: nowrap;
+        }
+        .modal-content {
+            border-radius: 10px;
+        }
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        .sortable:hover {
+            background-color: #f0f0f0;
+        }
+        .sortable i {
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+        .sortable.active i {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h4 class="mb-4 px-3"><i class="fas fa-ship me-2"></i>Admin Panel</h4>
+        <a href="/admin/maintenance" class="active">
+            <i class="fas fa-tools me-2"></i>Maintenance
+        </a>
+        <hr class="text-white">
+        <a href="/" target="_blank">
+            <i class="fas fa-home me-2"></i>Public Site
+        </a>
+        <a href="#" onclick="logout()">
+            <i class="fas fa-sign-out-alt me-2"></i>Logout
+        </a>
+    </div>
+    
+    <div class="main-content">
+        <h1 class="mb-4">Database Maintenance</h1>
+        
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4" id="maintenanceTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="ports-tab" data-bs-toggle="tab" data-bs-target="#ports" type="button">
+                    <i class="fas fa-anchor me-2"></i>Ports
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ships-tab" data-bs-toggle="tab" data-bs-target="#ships" type="button">
+                    <i class="fas fa-ship me-2"></i>Cruise Ships
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="meal-venues-tab" data-bs-toggle="tab" data-bs-target="#meal-venues" type="button">
+                    <i class="fas fa-utensils me-2"></i>Meal Venues
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="restaurants-tab" data-bs-toggle="tab" data-bs-target="#restaurants" type="button">
+                    <i class="fas fa-store me-2"></i>Restaurants
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="maintenanceTabContent">
+            <!-- Ports Tab -->
+            <div class="tab-pane fade show active" id="ports" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Ports Management</h5>
+                        <button class="btn btn-primary" onclick="showPortModal()">
+                            <i class="fas fa-plus me-2"></i>Add Port
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Bar -->
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="portsSearch" placeholder="Search ports by name, code, city, or country..." onkeyup="handlePortsSearch()">
+                                <button class="btn btn-outline-secondary" onclick="clearPortsSearch()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" onclick="sortPorts('id')">
+                                            ID <i class="fas fa-sort" id="sort-icon-id"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortPorts('portCode')">
+                                            Port Code <i class="fas fa-sort" id="sort-icon-portCode"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortPorts('name')">
+                                            Name <i class="fas fa-sort" id="sort-icon-name"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortPorts('city')">
+                                            City <i class="fas fa-sort" id="sort-icon-city"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortPorts('country')">
+                                            Country <i class="fas fa-sort" id="sort-icon-country"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortPorts('capacity')">
+                                            Capacity <i class="fas fa-sort" id="sort-icon-capacity"></i>
+                                        </th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="portsTableBody">
+                                    <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ships Tab -->
+            <div class="tab-pane fade" id="ships" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Cruise Ships Management</h5>
+                        <button class="btn btn-success" onclick="showShipModal()">
+                            <i class="fas fa-plus me-2"></i>Add Ship
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Bar -->
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="shipsSearch" placeholder="Search ships by name, cruise line, or MMSI..." onkeyup="handleShipsSearch()">
+                                <button class="btn btn-outline-secondary" onclick="clearShipsSearch()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" onclick="sortShips('id')">
+                                            ID <i class="fas fa-sort" id="sort-icon-ship-id"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortShips('name')">
+                                            Name <i class="fas fa-sort" id="sort-icon-ship-name"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortShips('cruiseLine')">
+                                            Cruise Line <i class="fas fa-sort" id="sort-icon-ship-cruiseLine"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortShips('capacity')">
+                                            Capacity <i class="fas fa-sort" id="sort-icon-ship-capacity"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortShips('mmsi')">
+                                            MMSI <i class="fas fa-sort" id="sort-icon-ship-mmsi"></i>
+                                        </th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shipsTableBody">
+                                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Meal Venues Tab -->
+            <div class="tab-pane fade" id="meal-venues" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Meal Venues Management</h5>
+                        <button class="btn btn-warning" onclick="showMealVenueModal()">
+                            <i class="fas fa-plus me-2"></i>Add Meal Venue
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Bar -->
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="mealVenuesSearch" placeholder="Search meal venues by name, cuisine, or port..." onkeyup="handleMealVenuesSearch()">
+                                <button class="btn btn-outline-secondary" onclick="clearMealVenuesSearch()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" onclick="sortMealVenues('id')">
+                                            ID <i class="fas fa-sort" id="sort-icon-venue-id"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortMealVenues('name')">
+                                            Name <i class="fas fa-sort" id="sort-icon-venue-name"></i>
+                                        </th>
+                                        <th>Port</th>
+                                        <th class="sortable" onclick="sortMealVenues('venueType')">
+                                            Venue Type <i class="fas fa-sort" id="sort-icon-venue-venueType"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortMealVenues('cuisineType')">
+                                            Cuisine <i class="fas fa-sort" id="sort-icon-venue-cuisineType"></i>
+                                        </th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mealVenuesTableBody">
+                                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Restaurants Tab -->
+            <div class="tab-pane fade" id="restaurants" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Restaurants Management</h5>
+                        <button class="btn btn-info" onclick="showRestaurantModal()">
+                            <i class="fas fa-plus me-2"></i>Add Restaurant
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search Bar -->
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="restaurantsSearch" placeholder="Search restaurants by name, cuisine, or port..." onkeyup="handleRestaurantsSearch()">
+                                <button class="btn btn-outline-secondary" onclick="clearRestaurantsSearch()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable" onclick="sortRestaurants('id')">
+                                            ID <i class="fas fa-sort" id="sort-icon-restaurant-id"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortRestaurants('name')">
+                                            Name <i class="fas fa-sort" id="sort-icon-restaurant-name"></i>
+                                        </th>
+                                        <th>Port</th>
+                                        <th class="sortable" onclick="sortRestaurants('cuisineType')">
+                                            Cuisine Type <i class="fas fa-sort" id="sort-icon-restaurant-cuisineType"></i>
+                                        </th>
+                                        <th class="sortable" onclick="sortRestaurants('rating')">
+                                            Rating <i class="fas fa-sort" id="sort-icon-restaurant-rating"></i>
+                                        </th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="restaurantsTableBody">
+                                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Port Modal -->
+    <div class="modal fade" id="portModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="portModalTitle">Add Port</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="portForm">
+                        <input type="hidden" id="portId">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Port Code *</label>
+                                <input type="text" class="form-control" id="portCode" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="portName" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City *</label>
+                                <input type="text" class="form-control" id="portCity" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Country *</label>
+                                <input type="text" class="form-control" id="portCountry" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Latitude *</label>
+                                <input type="number" step="0.00000001" class="form-control" id="portLatitude" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Longitude *</label>
+                                <input type="number" step="0.00000001" class="form-control" id="portLongitude" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Capacity *</label>
+                                <input type="number" class="form-control" id="portCapacity" required>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="savePort()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ship Modal -->
+    <div class="modal fade" id="shipModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shipModalTitle">Add Ship</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="shipForm">
+                        <input type="hidden" id="shipId">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="shipName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Cruise Line *</label>
+                                <input type="text" class="form-control" id="shipCruiseLine" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Capacity *</label>
+                                <input type="number" class="form-control" id="shipCapacity" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">MMSI</label>
+                                <input type="text" class="form-control" id="shipMmsi" placeholder="e.g., 123456789">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">IMO</label>
+                                <input type="text" class="form-control" id="shipImo" placeholder="e.g., IMO1234567">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Call Sign</label>
+                                <input type="text" class="form-control" id="shipCallSign">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Length (meters)</label>
+                                <input type="number" step="0.01" class="form-control" id="shipLengthMeters">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Width (meters)</label>
+                                <input type="number" step="0.01" class="form-control" id="shipWidthMeters">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Year Built</label>
+                                <input type="number" class="form-control" id="shipYearBuilt" min="1800" max="2100">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">AIS Enabled</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="shipAisEnabled" checked>
+                                    <label class="form-check-label" for="shipAisEnabled">Enable AIS tracking</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveShip()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function getBasePath() {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            const pathname = window.location.pathname;
+            
+            // If served from IntelliJ's web server (port 63342), use full URL to Spring Boot
+            if (port === '63342' || port === '') {
+                return 'http://localhost:8080/api/v1';
+            }
+            
+            // If served from Spring Boot (port 8080), check if context path is in URL
+            // The context path is /api/v1
+            if (pathname.startsWith('/api/v1')) {
+                return '/api/v1';
+            }
+            
+            // Default: use context path
+            return '/api/v1';
+        }
+        
+        function getAuthHeaders() {
+            // Try to get token from localStorage first
+            let token = localStorage.getItem('token');
+            
+            // If not in localStorage, try to get from cookie
+            if (!token) {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'token') {
+                        token = decodeURIComponent(value);
+                        // Store in localStorage for future use
+                        localStorage.setItem('token', token);
+                        break;
+                    }
+                }
+            }
+            
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            } else {
+                console.warn('No token found in localStorage or cookies');
+            }
+            return headers;
+        }
+        
+        // Ports Management - State
+        let portsState = {
+            search: '',
+            sortBy: null,
+            sortDir: 'ASC'
+        };
+        
+        async function loadPorts() {
+            try {
+                let url = `${getBasePath()}/admin/ports?size=100`;
+                if (portsState.search) {
+                    url += `&search=${encodeURIComponent(portsState.search)}`;
+                }
+                if (portsState.sortBy) {
+                    url += `&sortBy=${portsState.sortBy}&sortDir=${portsState.sortDir}`;
+                }
+                
+                const response = await fetch(url, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const tbody = document.getElementById('portsTableBody');
+                    if (!tbody) return;
+                    
+                    tbody.innerHTML = '';
+                    if (data.content && data.content.length > 0) {
+                        data.content.forEach(port => {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `
+                                <td>${port.id}</td>
+                                <td>${port.portCode}</td>
+                                <td>${port.name}</td>
+                                <td>${port.city}</td>
+                                <td>${port.country}</td>
+                                <td>${port.capacity}</td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-primary" onclick="editPort(${port.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deletePort(${port.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            `;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No ports found</td></tr>';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error loading ports:', response.status, errorText);
+                    const tbody = document.getElementById('portsTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${response.status}</td></tr>`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading ports:', error);
+                const tbody = document.getElementById('portsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+                }
+            }
+        }
+        
+        function handlePortsSearch() {
+            const searchValue = document.getElementById('portsSearch').value;
+            portsState.search = searchValue;
+            loadPorts();
+        }
+        
+        function clearPortsSearch() {
+            document.getElementById('portsSearch').value = '';
+            portsState.search = '';
+            loadPorts();
+        }
+        
+        function sortPorts(field) {
+            // Toggle sort direction if same field
+            if (portsState.sortBy === field) {
+                portsState.sortDir = portsState.sortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                portsState.sortBy = field;
+                portsState.sortDir = 'ASC';
+            }
+            
+            // Update sort icons
+            document.querySelectorAll('[id^="sort-icon-"]').forEach(icon => {
+                if (icon.id.startsWith('sort-icon-') && !icon.id.includes('ship') && !icon.id.includes('venue') && !icon.id.includes('restaurant')) {
+                    icon.className = 'fas fa-sort';
+                }
+            });
+            
+            const icon = document.getElementById(`sort-icon-${field}`);
+            if (icon) {
+                icon.className = portsState.sortDir === 'ASC' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                icon.parentElement.classList.add('active');
+            }
+            
+            loadPorts();
+        }
+        
+        function showPortModal(id = null) {
+            document.getElementById('portId').value = id || '';
+            document.getElementById('portModalTitle').textContent = id ? 'Edit Port' : 'Add Port';
+            if (id) {
+                fetch(`${getBasePath()}/admin/ports/${id}`, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                })
+                    .then(r => r.json())
+                    .then(port => {
+                        document.getElementById('portCode').value = port.portCode || '';
+                        document.getElementById('portName').value = port.name || '';
+                        document.getElementById('portCity').value = port.city || '';
+                        document.getElementById('portCountry').value = port.country || '';
+                        document.getElementById('portLatitude').value = port.latitude || '';
+                        document.getElementById('portLongitude').value = port.longitude || '';
+                        document.getElementById('portCapacity').value = port.capacity || '';
+                    })
+                    .catch(error => {
+                        console.error('Error loading port:', error);
+                        alert('Error loading port data');
+                    });
+            } else {
+                document.getElementById('portForm').reset();
+            }
+            new bootstrap.Modal(document.getElementById('portModal')).show();
+        }
+        
+        async function savePort() {
+            const id = document.getElementById('portId').value;
+            const port = {
+                portCode: document.getElementById('portCode').value,
+                name: document.getElementById('portName').value,
+                city: document.getElementById('portCity').value,
+                country: document.getElementById('portCountry').value,
+                latitude: parseFloat(document.getElementById('portLatitude').value),
+                longitude: parseFloat(document.getElementById('portLongitude').value),
+                capacity: parseInt(document.getElementById('portCapacity').value)
+            };
+            
+            const url = id ? `${getBasePath()}/admin/ports/${id}` : `${getBasePath()}/admin/ports`;
+            const method = id ? 'PUT' : 'POST';
+            
+            const headers = getAuthHeaders();
+            console.log('Saving port:', { url, method, headers, port });
+            
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: headers,
+                    credentials: 'include',
+                    body: JSON.stringify(port)
+                });
+                
+                console.log('Save port response:', response.status, response.statusText);
+                
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('portModal')).hide();
+                    loadPorts();
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error saving port:', response.status, errorText);
+                    alert(`Error saving port: ${response.status} - ${errorText.substring(0, 200)}`);
+                }
+            } catch (error) {
+                console.error('Error saving port:', error);
+                alert('Error saving port: ' + error.message);
+            }
+        }
+        
+        async function deletePort(id) {
+            if (confirm('Are you sure you want to delete this port?')) {
+                try {
+                    const response = await fetch(`${getBasePath()}/admin/ports/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        loadPorts();
+                    } else {
+                        console.error('Error deleting port:', response.status);
+                        alert(`Error deleting port: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting port:', error);
+                    alert('Error deleting port: ' + error.message);
+                }
+            }
+        }
+        
+        function editPort(id) {
+            showPortModal(id);
+        }
+        
+        // Ships Management - State
+        let shipsState = {
+            search: '',
+            sortBy: null,
+            sortDir: 'ASC'
+        };
+        
+        async function loadShips() {
+            try {
+                let url = `${getBasePath()}/admin/ships?size=100`;
+                if (shipsState.search) {
+                    url += `&search=${encodeURIComponent(shipsState.search)}`;
+                }
+                if (shipsState.sortBy) {
+                    url += `&sortBy=${shipsState.sortBy}&sortDir=${shipsState.sortDir}`;
+                }
+                
+                console.log('Loading ships from:', url);
+                const response = await fetch(url, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                console.log('Ships response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Ships data received:', data);
+                    const tbody = document.getElementById('shipsTableBody');
+                    if (!tbody) {
+                        console.error('shipsTableBody element not found');
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    if (data.content && data.content.length > 0) {
+                        data.content.forEach(ship => {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `
+                                <td>${ship.id}</td>
+                                <td>${ship.name || '-'}</td>
+                                <td>${ship.cruiseLine || '-'}</td>
+                                <td>${ship.capacity || '-'}</td>
+                                <td>${ship.mmsi || '-'}</td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-primary" onclick="editShip(${ship.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteShip(${ship.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            `;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No ships found</td></tr>';
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error loading ships:', response.status, errorText);
+                    const tbody = document.getElementById('shipsTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${response.status} - ${errorText.substring(0, 100)}</td></tr>`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading ships:', error);
+                const tbody = document.getElementById('shipsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${error.message}</td></tr>`;
+                }
+            }
+        }
+        
+        function handleShipsSearch() {
+            const searchValue = document.getElementById('shipsSearch').value;
+            shipsState.search = searchValue;
+            loadShips();
+        }
+        
+        function clearShipsSearch() {
+            document.getElementById('shipsSearch').value = '';
+            shipsState.search = '';
+            loadShips();
+        }
+        
+        function sortShips(field) {
+            if (shipsState.sortBy === field) {
+                shipsState.sortDir = shipsState.sortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                shipsState.sortBy = field;
+                shipsState.sortDir = 'ASC';
+            }
+            
+            document.querySelectorAll('[id^="sort-icon-ship-"]').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            
+            const icon = document.getElementById(`sort-icon-ship-${field}`);
+            if (icon) {
+                icon.className = shipsState.sortDir === 'ASC' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            }
+            
+            loadShips();
+        }
+        
+        function showShipModal(id = null) {
+            document.getElementById('shipId').value = id || '';
+            document.getElementById('shipModalTitle').textContent = id ? 'Edit Ship' : 'Add Ship';
+            if (id) {
+                fetch(`${getBasePath()}/admin/ships/${id}`, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                })
+                    .then(r => r.json())
+                    .then(ship => {
+                        document.getElementById('shipName').value = ship.name || '';
+                        document.getElementById('shipCruiseLine').value = ship.cruiseLine || '';
+                        document.getElementById('shipCapacity').value = ship.capacity || '';
+                        document.getElementById('shipMmsi').value = ship.mmsi || '';
+                        document.getElementById('shipImo').value = ship.imo || '';
+                        document.getElementById('shipCallSign').value = ship.callSign || '';
+                        document.getElementById('shipLengthMeters').value = ship.lengthMeters || '';
+                        document.getElementById('shipWidthMeters').value = ship.widthMeters || '';
+                        document.getElementById('shipYearBuilt').value = ship.yearBuilt || '';
+                        document.getElementById('shipAisEnabled').checked = ship.aisEnabled !== false; // Default to true
+                    })
+                    .catch(error => {
+                        console.error('Error loading ship:', error);
+                        alert('Error loading ship data');
+                    });
+            } else {
+                document.getElementById('shipForm').reset();
+                document.getElementById('shipAisEnabled').checked = true; // Default to true for new ships
+            }
+            new bootstrap.Modal(document.getElementById('shipModal')).show();
+        }
+        
+        function editShip(id) {
+            showShipModal(id);
+        }
+        
+        async function saveShip() {
+            const id = document.getElementById('shipId').value;
+            const ship = {
+                name: document.getElementById('shipName').value,
+                cruiseLine: document.getElementById('shipCruiseLine').value,
+                capacity: parseInt(document.getElementById('shipCapacity').value),
+                mmsi: document.getElementById('shipMmsi').value || null,
+                imo: document.getElementById('shipImo').value || null,
+                callSign: document.getElementById('shipCallSign').value || null,
+                lengthMeters: document.getElementById('shipLengthMeters').value ? parseFloat(document.getElementById('shipLengthMeters').value) : null,
+                widthMeters: document.getElementById('shipWidthMeters').value ? parseFloat(document.getElementById('shipWidthMeters').value) : null,
+                yearBuilt: document.getElementById('shipYearBuilt').value ? parseInt(document.getElementById('shipYearBuilt').value) : null,
+                aisEnabled: document.getElementById('shipAisEnabled').checked
+            };
+            
+            const url = id ? `${getBasePath()}/admin/ships/${id}` : `${getBasePath()}/admin/ships`;
+            const method = id ? 'PUT' : 'POST';
+            
+            const headers = getAuthHeaders();
+            console.log('Saving ship:', { url, method, headers, ship });
+            
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: headers,
+                    credentials: 'include',
+                    body: JSON.stringify(ship)
+                });
+                
+                console.log('Save ship response:', response.status, response.statusText);
+                
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('shipModal')).hide();
+                    loadShips();
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error saving ship:', response.status, errorText);
+                    alert(`Error saving ship: ${response.status} - ${errorText.substring(0, 200)}`);
+                }
+            } catch (error) {
+                console.error('Error saving ship:', error);
+                alert('Error saving ship: ' + error.message);
+            }
+        }
+        
+        async function deleteShip(id) {
+            if (confirm('Are you sure you want to delete this ship?')) {
+                try {
+                    const response = await fetch(`${getBasePath()}/admin/ships/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        loadShips();
+                    } else {
+                        console.error('Error deleting ship:', response.status);
+                        alert(`Error deleting ship: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting ship:', error);
+                    alert('Error deleting ship: ' + error.message);
+                }
+            }
+        }
+        
+        // Meal Venues Management - State
+        let mealVenuesState = {
+            search: '',
+            sortBy: null,
+            sortDir: 'ASC'
+        };
+        
+        async function loadMealVenues() {
+            try {
+                let url = `${getBasePath()}/admin/meal-venues?size=100`;
+                if (mealVenuesState.search) {
+                    url += `&search=${encodeURIComponent(mealVenuesState.search)}`;
+                }
+                if (mealVenuesState.sortBy) {
+                    url += `&sortBy=${mealVenuesState.sortBy}&sortDir=${mealVenuesState.sortDir}`;
+                }
+                
+                const response = await fetch(url, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const tbody = document.getElementById('mealVenuesTableBody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
+                    if (data.content && data.content.length > 0) {
+                        data.content.forEach(venue => {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `
+                                <td>${venue.id}</td>
+                                <td>${venue.name}</td>
+                                <td>${venue.port ? venue.port.name : '-'}</td>
+                                <td>${venue.venueType || '-'}</td>
+                                <td>${venue.cuisineType || '-'}</td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-primary" onclick="editMealVenue(${venue.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteMealVenue(${venue.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            `;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No meal venues found</td></tr>';
+                    }
+                } else {
+                    console.error('Error loading meal venues:', response.status);
+                    const tbody = document.getElementById('mealVenuesTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${response.status}</td></tr>`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading meal venues:', error);
+            }
+        }
+        
+        function handleMealVenuesSearch() {
+            const searchValue = document.getElementById('mealVenuesSearch').value;
+            mealVenuesState.search = searchValue;
+            loadMealVenues();
+        }
+        
+        function clearMealVenuesSearch() {
+            document.getElementById('mealVenuesSearch').value = '';
+            mealVenuesState.search = '';
+            loadMealVenues();
+        }
+        
+        function sortMealVenues(field) {
+            if (mealVenuesState.sortBy === field) {
+                mealVenuesState.sortDir = mealVenuesState.sortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                mealVenuesState.sortBy = field;
+                mealVenuesState.sortDir = 'ASC';
+            }
+            
+            document.querySelectorAll('[id^="sort-icon-venue-"]').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            
+            const icon = document.getElementById(`sort-icon-venue-${field}`);
+            if (icon) {
+                icon.className = mealVenuesState.sortDir === 'ASC' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            }
+            
+            loadMealVenues();
+        }
+        
+        function showMealVenueModal(id = null) {
+            alert('Meal venue modal - implement similar to port modal');
+        }
+        
+        function editMealVenue(id) {
+            showMealVenueModal(id);
+        }
+        
+        async function deleteMealVenue(id) {
+            if (confirm('Are you sure you want to delete this meal venue?')) {
+                try {
+                    const response = await fetch(`${getBasePath()}/admin/meal-venues/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        loadMealVenues();
+                    } else {
+                        console.error('Error deleting meal venue:', response.status);
+                        alert(`Error deleting meal venue: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting meal venue:', error);
+                    alert('Error deleting meal venue: ' + error.message);
+                }
+            }
+        }
+        
+        // Restaurants Management - State
+        let restaurantsState = {
+            search: '',
+            sortBy: null,
+            sortDir: 'ASC'
+        };
+        
+        async function loadRestaurants() {
+            try {
+                let url = `${getBasePath()}/admin/restaurants?size=100`;
+                if (restaurantsState.search) {
+                    url += `&search=${encodeURIComponent(restaurantsState.search)}`;
+                }
+                if (restaurantsState.sortBy) {
+                    url += `&sortBy=${restaurantsState.sortBy}&sortDir=${restaurantsState.sortDir}`;
+                }
+                
+                const response = await fetch(url, { 
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const tbody = document.getElementById('restaurantsTableBody');
+                    if (!tbody) return;
+                    tbody.innerHTML = '';
+                    if (data.content && data.content.length > 0) {
+                        data.content.forEach(restaurant => {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `
+                                <td>${restaurant.id}</td>
+                                <td>${restaurant.name}</td>
+                                <td>${restaurant.port ? restaurant.port.name : '-'}</td>
+                                <td>${restaurant.cuisineType || '-'}</td>
+                                <td>${restaurant.rating || '-'}</td>
+                                <td class="table-actions">
+                                    <button class="btn btn-sm btn-primary" onclick="editRestaurant(${restaurant.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteRestaurant(${restaurant.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            `;
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No restaurants found</td></tr>';
+                    }
+                } else {
+                    console.error('Error loading restaurants:', response.status);
+                    const tbody = document.getElementById('restaurantsTableBody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${response.status}</td></tr>`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading restaurants:', error);
+            }
+        }
+        
+        function handleRestaurantsSearch() {
+            const searchValue = document.getElementById('restaurantsSearch').value;
+            restaurantsState.search = searchValue;
+            loadRestaurants();
+        }
+        
+        function clearRestaurantsSearch() {
+            document.getElementById('restaurantsSearch').value = '';
+            restaurantsState.search = '';
+            loadRestaurants();
+        }
+        
+        function sortRestaurants(field) {
+            if (restaurantsState.sortBy === field) {
+                restaurantsState.sortDir = restaurantsState.sortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                restaurantsState.sortBy = field;
+                restaurantsState.sortDir = 'ASC';
+            }
+            
+            document.querySelectorAll('[id^="sort-icon-restaurant-"]').forEach(icon => {
+                icon.className = 'fas fa-sort';
+            });
+            
+            const icon = document.getElementById(`sort-icon-restaurant-${field}`);
+            if (icon) {
+                icon.className = restaurantsState.sortDir === 'ASC' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            }
+            
+            loadRestaurants();
+        }
+        
+        function showRestaurantModal(id = null) {
+            alert('Restaurant modal - implement similar to port modal');
+        }
+        
+        function editRestaurant(id) {
+            showRestaurantModal(id);
+        }
+        
+        async function deleteRestaurant(id) {
+            if (confirm('Are you sure you want to delete this restaurant?')) {
+                try {
+                    const response = await fetch(`${getBasePath()}/admin/restaurants/${id}`, {
+                        method: 'DELETE',
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        loadRestaurants();
+                    } else {
+                        console.error('Error deleting restaurant:', response.status);
+                        alert(`Error deleting restaurant: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting restaurant:', error);
+                    alert('Error deleting restaurant: ' + error.message);
+                }
+            }
+        }
+        
+        // Tab change handlers - ensure Bootstrap is ready
+        function setupTabHandlers() {
+            const portsTab = document.getElementById('ports-tab');
+            const shipsTab = document.getElementById('ships-tab');
+            const mealVenuesTab = document.getElementById('meal-venues-tab');
+            const restaurantsTab = document.getElementById('restaurants-tab');
+            
+            if (portsTab) {
+                portsTab.addEventListener('shown.bs.tab', loadPorts);
+            }
+            if (shipsTab) {
+                shipsTab.addEventListener('shown.bs.tab', loadShips);
+                // Also add click handler as fallback
+                shipsTab.addEventListener('click', function() {
+                    setTimeout(loadShips, 100); // Small delay to ensure tab is shown
+                });
+            }
+            if (mealVenuesTab) {
+                mealVenuesTab.addEventListener('shown.bs.tab', loadMealVenues);
+            }
+            if (restaurantsTab) {
+                restaurantsTab.addEventListener('shown.bs.tab', loadRestaurants);
+            }
+        }
+        
+        // Load initial data when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            setupTabHandlers();
+            // Load ports by default (active tab)
+            loadPorts();
+            // Also preload ships data
+            loadShips();
+        });
+        
+        async function logout() {
+            // Call logout endpoint to clear server-side cookie
+            try {
+                await fetch(`${getBasePath()}/auth/logout`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            
+            // Clear client-side storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            // Clear cookie manually as fallback
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            
+            // Redirect to login - use Spring Boot server URL
+            const currentPort = window.location.port;
+            if (currentPort === '8080') {
+                window.location.href = '/login';
+            } else {
+                window.location.href = 'http://localhost:8080/api/v1/login';
+            }
+        }
+        
+        // Initialize page - wrapped in IIFE to allow return statement
+        (function() {
+            // Check for token in URL (from login redirect) and set cookie
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenFromUrl = urlParams.get('token');
+            if (tokenFromUrl) {
+                // Set cookie for future requests
+                document.cookie = `token=${tokenFromUrl}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                document.cookie = `token=${tokenFromUrl}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                // Store in localStorage
+                localStorage.setItem('token', tokenFromUrl);
+                // Remove token from URL for security
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
+            // Check authentication
+            const token = localStorage.getItem('token') || tokenFromUrl;
+            if (!token) {
+                const currentPort = window.location.port;
+                if (currentPort === '8080') {
+                    window.location.href = '/login';
+                } else {
+                    window.location.href = 'http://localhost:8080/api/v1/login';
+                }
+                return;
+            }
+            
+            // Load initial data
+            loadPorts();
+            // Also preload ships data
+            loadShips();
+        })();
+    </script>
+</body>
+</html>
+

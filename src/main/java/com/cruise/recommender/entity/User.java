@@ -65,6 +65,11 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive = true;
     
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private Role role = Role.USER;
+    
     @CreatedDate
     @Column(name = "created_at")
     private LocalDateTime createdAt;

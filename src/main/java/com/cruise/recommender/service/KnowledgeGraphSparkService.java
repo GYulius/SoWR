@@ -31,11 +31,12 @@ import java.util.Map;
 public class KnowledgeGraphSparkService {
     
     // Use Object to prevent eager class loading of Spark classes
-    private Object sparkSession;
-    private Object javaSparkContext;
-    private Model rdfModel;
-    private org.apache.jena.query.Dataset jenaDataset; // Jena Dataset, not Spark Dataset
-    private boolean sparkAvailable = false;
+    private volatile Object sparkSession;
+    private volatile Object javaSparkContext;
+    private volatile Model rdfModel;
+    private volatile org.apache.jena.query.Dataset jenaDataset; // Jena Dataset, not Spark Dataset
+    private volatile boolean sparkAvailable = false;
+    private final Object initializationLock = new Object();
     
     @Value("${knowledge.graph.rdf.storage.path:./data/rdf-storage}")
     private String rdfStoragePath;
@@ -51,70 +52,99 @@ public class KnowledgeGraphSparkService {
     public void initialize() {
         // Initialize Jena RDF model first (doesn't require Spark)
         if (rdfModel == null) {
-            try {
-                // Initialize Jena TDB dataset for persistent RDF storage
-                org.apache.jena.query.Dataset tdbDataset = TDBFactory.createDataset(rdfStoragePath);
-                rdfModel = tdbDataset.getDefaultModel();
-                
-                // Set up namespace prefixes
-                rdfModel.setNsPrefix("cruise", namespace);
-                rdfModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-                rdfModel.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-                rdfModel.setNsPrefix("owl", "http://www.w3.org/2002/07/owl#");
-                rdfModel.setNsPrefix("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
-                
-                jenaDataset = new DatasetImpl(rdfModel);
-                
-                log.info("Jena RDF model initialized with namespace: {}", namespace);
-            } catch (Exception e) {
-                log.error("Error initializing Jena RDF model", e);
+            synchronized (initializationLock) {
+                if (rdfModel == null) {
+                    try {
+                        // Initialize Jena TDB dataset for persistent RDF storage
+                        org.apache.jena.query.Dataset tdbDataset = TDBFactory.createDataset(rdfStoragePath);
+                        rdfModel = tdbDataset.getDefaultModel();
+                        
+                        // Set up namespace prefixes
+                        rdfModel.setNsPrefix("cruise", namespace);
+                        rdfModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+                        rdfModel.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
+                        rdfModel.setNsPrefix("owl", "http://www.w3.org/2002/07/owl#");
+                        rdfModel.setNsPrefix("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
+                        
+                        jenaDataset = new DatasetImpl(rdfModel);
+                        
+                        log.info("Jena RDF model initialized with namespace: {}", namespace);
+                    } catch (Exception e) {
+                        log.error("Error initializing Jena RDF model", e);
+                    }
+                }
             }
         }
         
         // Initialize Spark session lazily using reflection to prevent class loading errors
         // Spark may fail on Java 9+ due to module system restrictions
+        // Use double-check locking to prevent multiple SparkContext creation
         if (sparkSession == null && !sparkAvailable) {
-            try {
-                // Use reflection to avoid eager class loading
-                // Catch all possible initialization errors
-                Class<?> sparkSessionClass = Class.forName("org.apache.spark.sql.SparkSession");
-                Class<?> sparkSessionBuilderClass = Class.forName("org.apache.spark.sql.SparkSession$Builder");
-                
-                Object builder = sparkSessionClass.getMethod("builder").invoke(null);
-                builder = sparkSessionBuilderClass.getMethod("appName", String.class).invoke(builder, "KnowledgeGraphProcessor");
-                builder = sparkSessionBuilderClass.getMethod("master", String.class).invoke(builder, "local[*]");
-                builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.sql.warehouse.dir", "file:///tmp/spark-warehouse");
-                builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.driver.memory", "2g");
-                builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.executor.memory", "2g");
-                
-                sparkSession = sparkSessionBuilderClass.getMethod("getOrCreate").invoke(builder);
-                
-                // Initialize JavaSparkContext
-                Class<?> javaSparkContextClass = Class.forName("org.apache.spark.api.java.JavaSparkContext");
-                Object sparkContext = sparkSessionClass.getMethod("sparkContext").invoke(sparkSession);
-                javaSparkContext = javaSparkContextClass.getMethod("fromSparkContext", 
-                    Class.forName("org.apache.spark.SparkContext")).invoke(null, sparkContext);
-                
-                sparkAvailable = true;
-                log.info("Spark session initialized for Knowledge Graph processing");
-            } catch (ClassNotFoundException e) {
-                log.warn("Spark classes not found on classpath. Spark features will be disabled.");
-                sparkAvailable = false;
-            } catch (NoClassDefFoundError | ExceptionInInitializerError e) {
-                log.warn("Spark classes cannot be initialized due to Java module restrictions. " +
-                        "Spark features will be disabled. To enable Spark, add JVM arguments: " +
-                        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED " +
-                        "--add-opens=java.base/java.lang=ALL-UNNAMED " +
-                        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED " +
-                        "--add-opens=java.base/java.io=ALL-UNNAMED");
-                sparkAvailable = false;
-            } catch (Throwable e) {
-                // Catch any other errors including LinkageError, etc.
-                log.warn("Failed to initialize Spark session. Spark features will be disabled. " +
-                        "Error: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
-                        ". To enable Spark, add JVM arguments: " +
-                        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED");
-                sparkAvailable = false;
+            synchronized (initializationLock) {
+                // Double-check after acquiring lock
+                if (sparkSession == null && !sparkAvailable) {
+                    try {
+                        // Check if SparkContext already exists (from previous failed initialization)
+                        try {
+                            Class<?> sparkContextClass = Class.forName("org.apache.spark.SparkContext");
+                            Object existingContext = sparkContextClass.getMethod("getActive").invoke(null);
+                            if (existingContext != null) {
+                                log.warn("Another SparkContext is already active. Reusing existing context.");
+                                // Try to get SparkSession from existing context
+                                Class<?> sparkSessionClass = Class.forName("org.apache.spark.sql.SparkSession");
+                                sparkSession = sparkSessionClass.getMethod("active").invoke(null);
+                                if (sparkSession != null) {
+                                    sparkAvailable = true;
+                                    log.info("Reusing existing Spark session");
+                                    return;
+                                }
+                            }
+                        } catch (Exception e) {
+                            // No active context, proceed with creation
+                        }
+                        
+                        // Use reflection to avoid eager class loading
+                        // Catch all possible initialization errors
+                        Class<?> sparkSessionClass = Class.forName("org.apache.spark.sql.SparkSession");
+                        Class<?> sparkSessionBuilderClass = Class.forName("org.apache.spark.sql.SparkSession$Builder");
+                        
+                        Object builder = sparkSessionClass.getMethod("builder").invoke(null);
+                        builder = sparkSessionBuilderClass.getMethod("appName", String.class).invoke(builder, "KnowledgeGraphProcessor");
+                        builder = sparkSessionBuilderClass.getMethod("master", String.class).invoke(builder, "local[*]");
+                        builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.sql.warehouse.dir", "file:///tmp/spark-warehouse");
+                        builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.driver.memory", "2g");
+                        builder = sparkSessionBuilderClass.getMethod("config", String.class, String.class).invoke(builder, "spark.executor.memory", "2g");
+                        
+                        sparkSession = sparkSessionBuilderClass.getMethod("getOrCreate").invoke(builder);
+                        
+                        // Initialize JavaSparkContext
+                        Class<?> javaSparkContextClass = Class.forName("org.apache.spark.api.java.JavaSparkContext");
+                        Object sparkContext = sparkSessionClass.getMethod("sparkContext").invoke(sparkSession);
+                        javaSparkContext = javaSparkContextClass.getMethod("fromSparkContext", 
+                            Class.forName("org.apache.spark.SparkContext")).invoke(null, sparkContext);
+                        
+                        sparkAvailable = true;
+                        log.info("Spark session initialized for Knowledge Graph processing");
+                    } catch (ClassNotFoundException e) {
+                        log.warn("Spark classes not found on classpath. Spark features will be disabled.");
+                        sparkAvailable = false;
+                    } catch (NoClassDefFoundError | ExceptionInInitializerError e) {
+                        log.warn("Spark classes cannot be initialized due to Java module restrictions. " +
+                                "Spark features will be disabled. To enable Spark, add JVM arguments: " +
+                                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED " +
+                                "--add-opens=java.base/java.lang=ALL-UNNAMED " +
+                                "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED " +
+                                "--add-opens=java.base/java.io=ALL-UNNAMED");
+                        sparkAvailable = false;
+                    } catch (Throwable e) {
+                        // Catch any other errors including LinkageError, etc.
+                        log.warn("Failed to initialize Spark session. Spark features will be disabled. " +
+                                "Error: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
+                                ". To enable Spark, add JVM arguments: " +
+                                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED");
+                        sparkAvailable = false;
+                    }
+                }
             }
         }
         

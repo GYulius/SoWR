@@ -29,6 +29,7 @@ public class AisDataIngestionService {
     
     private final RabbitTemplate rabbitTemplate;
     private final RestTemplate restTemplate = new RestTemplate();
+    private final OpenAisApiClient openAisApiClient;
     
     @Value("${ais.data.source.api.url:}")
     private String aisApiUrl;
@@ -36,8 +37,14 @@ public class AisDataIngestionService {
     @Value("${ais.data.source.api.key:}")
     private String aisApiKey;
     
-    @Value("${ais.data.simulation.enabled:true}")
+    @Value("${ais.data.source.api.provider:MARINETRAFFIC}")
+    private String aisProvider;
+    
+    @Value("${ais.data.simulation.enabled:false}")
     private boolean simulationEnabled;
+    
+    @Value("${openais.enabled:false}")
+    private boolean openAisEnabled;
     
     @Value("${ais.data.ingestion.interval:30000}")
     private long ingestionInterval;
@@ -58,11 +65,15 @@ public class AisDataIngestionService {
             if (simulationEnabled) {
                 // Generate simulated AIS data for testing
                 aisDataList = generateSimulatedAisData();
+            } else if (openAisEnabled) {
+                // Fetch from Open-AIS (free Norwegian coastguard data)
+                log.debug("Fetching AIS data from Open-AIS");
+                aisDataList = openAisApiClient.fetchAisData();
             } else if (aisApiUrl != null && !aisApiUrl.isEmpty()) {
-                // Fetch from external API
+                // Fetch from external API (MarineTraffic, VesselFinder, etc.)
                 aisDataList = fetchFromExternalApi();
             } else {
-                log.warn("No AIS data source configured. Enable simulation or configure API URL.");
+                log.warn("No AIS data source configured. Enable simulation, Open-AIS, or configure API URL.");
                 return;
             }
             
@@ -105,37 +116,134 @@ public class AisDataIngestionService {
     
     /**
      * Fetch AIS data from external API
-     * Supports various AIS data providers (MarineTraffic, VesselFinder, etc.)
+     * Supports various AIS data providers (MarineTraffic, VesselFinder, AISHub, etc.)
      */
     private List<AisDataMessage> fetchFromExternalApi() {
         List<AisDataMessage> aisDataList = new ArrayList<>();
         
+        if (aisApiUrl == null || aisApiUrl.isEmpty()) {
+            log.warn("AIS API URL is not configured. Cannot fetch real AIS data.");
+            return aisDataList;
+        }
+        
+        if (aisApiKey == null || aisApiKey.isEmpty()) {
+            log.warn("AIS API key is not configured. Cannot fetch real AIS data.");
+            return aisDataList;
+        }
+        
         try {
-            // Example: MarineTraffic API or similar
-            String url = aisApiUrl + "?api_key=" + aisApiKey;
+            String url = buildApiUrl();
+            log.debug("Fetching AIS data from: {}", url.replace(aisApiKey, "***"));
             
             // Make API call (adjust based on actual API response format)
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             
             // Parse response and convert to AisDataMessage
-            // This is a placeholder - adjust based on actual API response structure
-            if (response != null && response.containsKey("data")) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> vessels = (List<Map<String, Object>>) response.get("data");
+            // Different providers have different response formats
+            if (response != null) {
+                List<Map<String, Object>> vessels = parseApiResponse(response);
                 
                 for (Map<String, Object> vessel : vessels) {
                     AisDataMessage message = convertApiResponseToMessage(vessel);
-                    if (message != null) {
+                    if (message != null && message.getMmsi() != null && !message.getMmsi().trim().isEmpty()) {
                         aisDataList.add(message);
+                        log.debug("Fetched AIS data for MMSI: {}, Ship: {}, Source: {}", 
+                                message.getMmsi(), message.getShipName(), message.getDataSource());
                     }
                 }
             }
             
+            log.info("Fetched {} AIS data records from {} provider", aisDataList.size(), aisProvider);
+            
         } catch (Exception e) {
-            log.error("Error fetching AIS data from external API", e);
+            log.error("Error fetching AIS data from external API: {}", e.getMessage(), e);
         }
         
         return aisDataList;
+    }
+    
+    /**
+     * Build API URL based on provider type
+     */
+    private String buildApiUrl() {
+        String provider = aisProvider.toUpperCase();
+        
+        switch (provider) {
+            case "MARINETRAFFIC":
+                // MarineTraffic API format
+                return aisApiUrl + "?api_key=" + aisApiKey + "&timespan=10&protocol=jsono";
+            case "VESSELFINDER":
+                // VesselFinder API format
+                return aisApiUrl + "?api_key=" + aisApiKey;
+            case "AISHUB":
+                // AISHub API format
+                return aisApiUrl + "?key=" + aisApiKey + "&format=json";
+            case "OPENAIS":
+                // Open-AIS uses PG_FeatureServ API (handled separately)
+                return aisApiUrl;
+            default:
+                // Generic format
+                return aisApiUrl + "?api_key=" + aisApiKey;
+        }
+    }
+    
+    /**
+     * Parse API response based on provider format
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> parseApiResponse(Map<String, Object> response) {
+        String provider = aisProvider.toUpperCase();
+        List<Map<String, Object>> vessels = new ArrayList<>();
+        
+        switch (provider) {
+            case "MARINETRAFFIC":
+                // MarineTraffic returns data in "data" array
+                if (response.containsKey("data")) {
+                    Object dataObj = response.get("data");
+                    if (dataObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) dataObj;
+                    }
+                }
+                break;
+            case "VESSELFINDER":
+                // VesselFinder may return data directly or in "vessels" array
+                if (response.containsKey("vessels")) {
+                    Object vesselsObj = response.get("vessels");
+                    if (vesselsObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) vesselsObj;
+                    }
+                } else if (response.containsKey("data")) {
+                    Object dataObj = response.get("data");
+                    if (dataObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) dataObj;
+                    }
+                }
+                break;
+            case "AISHUB":
+                // AISHub returns data in "positions" array
+                if (response.containsKey("positions")) {
+                    Object positionsObj = response.get("positions");
+                    if (positionsObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) positionsObj;
+                    }
+                }
+                break;
+            default:
+                // Try common field names
+                if (response.containsKey("data")) {
+                    Object dataObj = response.get("data");
+                    if (dataObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) dataObj;
+                    }
+                } else if (response.containsKey("vessels")) {
+                    Object vesselsObj = response.get("vessels");
+                    if (vesselsObj instanceof List) {
+                        vessels = (List<Map<String, Object>>) vesselsObj;
+                    }
+                }
+        }
+        
+        return vessels;
     }
     
     /**
@@ -174,8 +282,8 @@ public class AisDataIngestionService {
                 .imo(String.valueOf(vessel.getOrDefault("imo", "")).trim())
                 .callSign(String.valueOf(vessel.getOrDefault("callsign", vessel.getOrDefault("call_sign", ""))).trim())
                 .stationRange(getDoubleValue(vessel, "station_range"))
-                .signalQuality(String.valueOf(vessel.getOrDefault("signal_quality", "GOOD")).trim())
-                .dataSource(String.valueOf(vessel.getOrDefault("data_source", "API")).trim())
+                .signalQuality(String.valueOf(vessel.getOrDefault("signal_quality", vessel.getOrDefault("signalQuality", "GOOD"))).trim())
+                .dataSource(determineDataSource(vessel))
                 .build();
         } catch (Exception e) {
             log.error("Error converting API response to AIS message", e);
@@ -243,8 +351,15 @@ public class AisDataIngestionService {
                 continue;
             }
             
+            // Ensure MMSI is valid before building
+            String validMmsi = mmsi.trim();
+            if (validMmsi.isEmpty() || "null".equalsIgnoreCase(validMmsi)) {
+                log.warn("Skipping ship {}: Invalid MMSI '{}'", shipNames[shipIndex], mmsi);
+                continue;
+            }
+            
             AisDataMessage message = AisDataMessage.builder()
-                .mmsi(mmsi.trim())
+                .mmsi(validMmsi)
                 .shipName(shipNames[shipIndex])
                 .latitude(latitude)
                 .longitude(longitude)
@@ -262,9 +377,15 @@ public class AisDataIngestionService {
                 .dataSource("SIMULATION")
                 .build();
             
-            // Double-check MMSI is set after building
+            // Double-check MMSI is set after building - this should never happen if builder works correctly
             if (message.getMmsi() == null || message.getMmsi().trim().isEmpty()) {
-                log.error("MMSI is null after building message for ship: {}", shipNames[shipIndex]);
+                log.error("CRITICAL: MMSI is null after building message for ship: {}. This indicates a builder issue.", shipNames[shipIndex]);
+                continue;
+            }
+            
+            // Validate the entire message before adding
+            if (message.getShipName() == null || message.getLatitude() == null || message.getLongitude() == null) {
+                log.warn("Skipping incomplete message for ship: {}", shipNames[shipIndex]);
                 continue;
             }
             
@@ -291,6 +412,48 @@ public class AisDataIngestionService {
     private String getRandomDataSource() {
         String[] sources = {"SATELLITE", "TERRESTRIAL", "BOTH"};
         return sources[random.nextInt(sources.length)];
+    }
+    
+    /**
+     * Determine data source from vessel data
+     * Real AIS data providers indicate source (terrestrial, satellite, or both)
+     */
+    private String determineDataSource(Map<String, Object> vessel) {
+        // Check for explicit data source field
+        Object sourceObj = vessel.getOrDefault("data_source", vessel.getOrDefault("dataSource", vessel.getOrDefault("source", null)));
+        if (sourceObj != null) {
+            String source = String.valueOf(sourceObj).trim().toUpperCase();
+            if (source.contains("SATELLITE") || source.contains("SAT")) {
+                return "SATELLITE";
+            } else if (source.contains("TERRESTRIAL") || source.contains("TERR")) {
+                return "TERRESTRIAL";
+            } else if (source.contains("BOTH") || source.contains("HYBRID")) {
+                return "BOTH";
+            }
+        }
+        
+        // Check station range - satellite typically has longer range
+        Object rangeObj = vessel.get("station_range");
+        if (rangeObj != null) {
+            try {
+                double range = Double.parseDouble(String.valueOf(rangeObj));
+                if (range > 50) {
+                    return "SATELLITE"; // Long range typically indicates satellite
+                } else {
+                    return "TERRESTRIAL"; // Short range typically indicates terrestrial
+                }
+            } catch (NumberFormatException e) {
+                // Ignore
+            }
+        }
+        
+        // Default based on provider
+        String provider = aisProvider.toUpperCase();
+        if (provider.contains("SATELLITE") || provider.contains("SAT")) {
+            return "SATELLITE";
+        } else {
+            return "TERRESTRIAL"; // Most providers are terrestrial-based
+        }
     }
     
     private Double getDoubleValue(Map<String, Object> map, String key) {
