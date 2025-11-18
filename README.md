@@ -245,7 +245,32 @@ graph TB
    ./scripts/start-services.sh
    ```
 
-5. **Start the application**
+5. **Set up AIS data source (Optional but recommended)**
+   
+   **Option A: Open-AIS with PG_FeatureServ Container (Recommended)**
+   
+   The safest way is to use the containerized PG_FeatureServ service:
+   
+   ```bash
+   # Add PG_FeatureServ to docker-compose.yml (already included)
+   # Configure DATABASE_URL environment variable
+   export PG_FEATURESERV_DATABASE_URL=postgresql://user:pass@host:5432/dbname
+   
+   # Start PG_FeatureServ container
+   docker-compose up -d pg_featureserv
+   ```
+   
+   See [docs/PG_FEATURESERV_SETUP.md](docs/PG_FEATURESERV_SETUP.md) for detailed setup instructions.
+   
+   **Option B: Use Remote Open-AIS Instance**
+   - Point to a remote PG_FeatureServ API endpoint
+   - Set `OPENAIS_API_BASE_URL` in `application.yml`
+   
+   **Option C: Use Paid Providers**
+   - Configure API keys in `application.yml` (see Configuration section)
+   - Set `ais.data.source.api.provider` to your provider (MARINETRAFFIC, VESSELFINDER, etc.)
+
+6. **Start the application**
    ```bash
    mvn spring-boot:run
    ```
@@ -293,6 +318,33 @@ sparql:
 jwt:
   secret: TBD
   expiration: 604800000
+
+# AIS Data Sources
+# Option 1: Open-AIS (Free - Recommended)
+openais:
+  enabled: true
+  api:
+    base:
+      url: http://localhost:9000
+
+ais:
+  data:
+    source:
+      api:
+        provider: OPENAIS  # Options: OPENAIS, MARINETRAFFIC, VESSELFINDER, AISHUB
+    simulation:
+      enabled: false
+
+# Option 2: Paid Providers (MarineTraffic, VesselFinder, etc.)
+# ais:
+#   data:
+#     source:
+#       api:
+#         url: https://services.marinetraffic.com/api/exportvessel
+#         key: your_api_key
+#         provider: MARINETRAFFIC
+#     simulation:
+#       enabled: false
 
 # Notification Services
 spring:

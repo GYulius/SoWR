@@ -60,11 +60,11 @@
 <body>
     <div class="sidebar">
         <h4 class="mb-4 px-3"><i class="fas fa-ship me-2"></i>Admin Panel</h4>
-        <a href="/admin/maintenance" class="active">
+        <a th:href="@{/admin/maintenance}" href="/api/v1/admin/maintenance" class="active">
             <i class="fas fa-tools me-2"></i>Maintenance
         </a>
         <hr class="text-white">
-        <a href="/" target="_blank">
+        <a th:href="@{/}" href="/api/v1/" target="_blank">
             <i class="fas fa-home me-2"></i>Public Site
         </a>
         <a href="#" onclick="logout()">
@@ -1185,10 +1185,11 @@
             // Clear cookie manually as fallback
             document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
             
-            // Redirect to login - use Spring Boot server URL
+            // Redirect to login - use Spring Boot server URL with context path
+            const basePath = getBasePath();
             const currentPort = window.location.port;
             if (currentPort === '8080') {
-                window.location.href = '/login';
+                window.location.href = `${basePath}/login`;
             } else {
                 window.location.href = 'http://localhost:8080/api/v1/login';
             }
@@ -1212,9 +1213,10 @@
             // Check authentication
             const token = localStorage.getItem('token') || tokenFromUrl;
             if (!token) {
+                const basePath = getBasePath();
                 const currentPort = window.location.port;
                 if (currentPort === '8080') {
-                    window.location.href = '/login';
+                    window.location.href = `${basePath}/login`;
                 } else {
                     window.location.href = 'http://localhost:8080/api/v1/login';
                 }

@@ -14,7 +14,7 @@
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 100px 0;
+            padding: 10px 0;
         }
         .feature-card {
             transition: transform 0.3s ease;
@@ -57,62 +57,315 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#features">Features</a>
+                    <li class="nav-item" id="myInterestsNavItem" style="display: none;">
+                        <a class="nav-link" href="#myPersonalInterests">
+                            <i class="fas fa-heart me-1"></i>My Interests
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#ports">Ports</a>
+                        <a class="nav-link" href="#ports" th:text="#{nav.ports}">Ports</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#foodie">Foodie</a>
+                        <a class="nav-link" href="#foodie" th:text="#{nav.foodie}">Foodie</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/swagger-ui.html" target="_blank">API Docs</a>
+                        <a class="nav-link" href="#features" th:text="#{nav.features}">Features</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/actuator/health" target="_blank">Health</a>
+                        <a class="nav-link" th:href="@{/swagger-ui.html}" href="/api/v1/swagger-ui.html" target="_blank" th:text="#{nav.apiDocs}">API Docs</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" th:href="@{/actuator/health}" href="/api/v1/actuator/health" target="_blank" th:text="#{nav.health}">Health</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-globe me-1"></i><span th:text="#{nav.language}">Language</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
+                            <li><a class="dropdown-item" href="?lang=en">English</a></li>
+                            <li><a class="dropdown-item" href="?lang=de">Deutsch</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item" id="loginNavItem">
+                        <a class="nav-link" href="#" onclick="showLoginModal(); return false;">
+                            <i class="fas fa-sign-in-alt me-1"></i><span th:text="#{nav.login}">Login</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown" id="userNavItem" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-1"></i><span id="userNavName">User</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="logout(); return false;">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="hero-section text-center">
+    <!-- Hero Section (hidden for logged-in USER) -->
+    <section id="heroSection" class="hero-section text-center">
         <div class="container">
-            <h1 class="display-4 fw-bold mb-4">
-                <i class="fas fa-ship me-3"></i>
-                Social Web Recommender for Cruising Ports
-            </h1>
-            <p class="lead mb-4">
-                An intelligent recommendation system for cruise passengers, local businesses, and port authorities
+            <p class="lead mb-4" th:text="#{hero.subtitle}">
+                Social Web Recommender for Cruising Ports: an intelligent recommendation system for cruise passengers, local businesses, and port authorities
             </p>
             <div class="row justify-content-center">
                 <div class="col-md-8">
-                    <p class="fs-5">
+                    <p class="fs-5" th:text="#{hero.description}">
                         Leveraging RDF knowledge graphs, machine learning, and real-time publisher-subscriber systems 
                         to enhance the cruise tourism experience.
                     </p>
                 </div>
             </div>
-            <div class="mt-4">
-                <a href="#features" class="btn btn-light btn-lg me-3">
-                    <i class="fas fa-rocket me-2"></i>Explore Features
-                </a>
-                <a href="/swagger-ui.html" class="btn btn-outline-light btn-lg" target="_blank">
-                    <i class="fas fa-code me-2"></i>API Documentation
-                </a>
+        </div>
+    </section>
+
+    <!-- My Personal Interests Section (shown when logged in as USER, replaces Hero) -->
+    <section id="myPersonalInterests" class="py-5" style="display: none;">
+        <div class="container">
+            <div class="row text-center mb-4">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold">
+                        <i class="fas fa-heart me-3"></i>My Personal Interests
+                    </h2>
+                    <p class="lead">Customize your preferences to get better recommendations</p>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter me-2"></i>Set Your Preferences
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="interestsForm">
+                                <!-- Cruise Ship -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-ship me-2"></i>Cruise Ship Preferences
+                                    </label>
+                                    <input type="text" class="form-control" id="cruiseShipInterests" 
+                                           placeholder="e.g., Large ships, Family-friendly, Luxury">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Port of Call -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-anchor me-2"></i>Port of Call Preferences
+                                    </label>
+                                    <input type="text" class="form-control" id="portInterests" 
+                                           placeholder="e.g., Mediterranean, Caribbean, Historical ports">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Activities -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-running me-2"></i>Activities
+                                    </label>
+                                    <input type="text" class="form-control" id="activityInterests" 
+                                           placeholder="e.g., Swimming, Hiking, Snorkeling, Shopping">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Tourist Attractions -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-camera me-2"></i>Tourist Attractions
+                                    </label>
+                                    <input type="text" class="form-control" id="attractionInterests" 
+                                           placeholder="e.g., Museums, Beaches, Historical sites, Art galleries">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Meal Venues -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-utensils me-2"></i>Meal Venues
+                                    </label>
+                                    <input type="text" class="form-control" id="mealVenueInterests" 
+                                           placeholder="e.g., Fine dining, Local cuisine, Seafood, Vegetarian">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Restaurants -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-store me-2"></i>Restaurants
+                                    </label>
+                                    <input type="text" class="form-control" id="restaurantInterests" 
+                                           placeholder="e.g., Italian, Asian, Mediterranean, Fast food">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- Shore Excursions -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-umbrella-beach me-2"></i>Shore Excursions
+                                    </label>
+                                    <input type="text" class="form-control" id="excursionInterests" 
+                                           placeholder="e.g., Adventure tours, Cultural tours, Water sports, City tours">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <!-- General Interests -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-star me-2"></i>General Interests
+                                    </label>
+                                    <input type="text" class="form-control" id="generalInterests" 
+                                           placeholder="e.g., History, Art, Nature, Adventure, Food, Shopping">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="saveInterests()">
+                                        <i class="fas fa-save me-2"></i>Save My Interests
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-list me-2"></i>My Interests as a Passenger
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="savedInterestsList">
+                                <p class="text-muted">No interests saved yet. Set your preferences and click "Save My Interests".</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Ports Section - Moved right after Hero -->
+    <!-- User Recommendations Section (shown when logged in as USER) -->
+    <section id="userRecommendations" class="py-5 bg-light" style="display: none;">
+        <div class="container">
+            <div class="row text-center mb-4">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold">
+                        <i class="fas fa-user-circle me-3"></i>Your Personalized Recommendations
+                    </h2>
+                    <p class="lead">Welcome, <span id="userName"></span>!</p>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <label for="userPortSelect" class="form-label fw-bold">
+                                <i class="fas fa-map-marker-alt me-2"></i>Select a Port for Recommendations:
+                            </label>
+                            <select id="userPortSelect" class="form-select form-select-lg">
+                                <option value="">-- Select a Port --</option>
+                                <!-- Ports will be loaded dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="userRecommendationsContent" style="display: none;">
+                <!-- Port Map -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-map me-2"></i>Port Location Map
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="userPortMap" style="height: 400px; width: 100%; border-radius: 8px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Foodie Details -->
+                <div class="row mb-4" id="userFoodieSection" style="display: none;">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-drumstick-bite me-2"></i>Main Dish
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <h4 id="userFoodieMainName" class="text-warning mb-3"></h4>
+                                <p id="userFoodieMainRecipe" class="card-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-birthday-cake me-2"></i>Dessert
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <h4 id="userFoodieDessertName" class="text-danger mb-3"></h4>
+                                <p id="userFoodieDessertRecipe" class="card-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recommendations -->
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-umbrella-beach me-2"></i>Shore Excursions
+                                </h5>
+                            </div>
+                            <div class="card-body" id="shoreExcursionsContent">
+                                <p class="text-muted">Select a port to see recommendations</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-utensils me-2"></i>Meal Venues
+                                </h5>
+                            </div>
+                            <div class="card-body" id="mealVenuesContent">
+                                <p class="text-muted">Select a port to see recommendations</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ports Section -->
     <section id="ports" class="py-5">
         <div class="container">
             <div class="row text-center mb-5">
                 <div class="col-12">
-                    <h2 class="display-5 fw-bold">Featured Ports</h2>
-                    <p class="lead">Explore our supported cruise ports</p>
+                    <h2 class="display-5 fw-bold" th:text="#{ports.title}">Featured Ports</h2>
+                    <p class="lead" th:text="#{ports.subtitle}">Explore our supported cruise ports</p>
                 </div>
             </div>
             
@@ -124,16 +377,17 @@
                             <div class="row align-items-center port-selector">
                                 <div class="col-md-4">
                                     <label for="portSelect" class="form-label fw-bold">
-                                        <i class="fas fa-map-marker-alt me-2"></i>Select a Port:
+                                        <i class="fas fa-map-marker-alt me-2"></i><span th:text="#{ports.selectPort}">Select a Port:</span>
                                     </label>
                                     <input type="text" id="portSearch" class="form-control mb-2" 
+                                           th:placeholder="#{ports.searchPorts}" 
                                            placeholder="Search ports..." 
                                            onkeyup="filterPorts()">
                                     <select id="portSelect" class="form-select form-select-lg" size="10" style="max-height: 300px;">
-                                        <option value="">-- Select a Port --</option>
+                                        <option value="" th:text="#{ports.selectPortPlaceholder}">-- Select a Port --</option>
                                         <!-- Ports will be loaded dynamically from database -->
                                     </select>
-                                    <small class="text-muted" id="portCount">Total ports: 0</small>
+                                    <small class="text-muted" id="portCount" th:text="#{ports.totalPorts(0)}">Total ports: 0</small>
                                 </div>
                                 <div class="col-md-8">
                                     <div id="portInfo" class="text-muted" style="display: none;">
@@ -151,7 +405,7 @@
             <!-- Port Cards -->
             <div class="row" id="portCardsContainer">
                 <div class="col-12 text-center">
-                    <p class="text-muted">Select a port to view details</p>
+                    <p class="text-muted" th:text="#{ports.selectPortToView}">Select a port to view details</p>
                 </div>
             </div>
         </div>
@@ -163,9 +417,9 @@
             <div class="row text-center mb-5">
                 <div class="col-12">
                     <h2 class="display-5 fw-bold">
-                        <i class="fas fa-utensils me-3"></i>Foodie Delights
+                        <i class="fas fa-utensils me-3"></i><span th:text="#{foodie.title}">Foodie Delights</span>
                     </h2>
-                    <p class="lead">Discover local culinary specialties at each port</p>
+                    <p class="lead" th:text="#{foodie.subtitle}">Discover local culinary specialties at each port</p>
                 </div>
             </div>
             
@@ -174,10 +428,10 @@
                     <div class="card">
                         <div class="card-body">
                             <label for="foodiePortSelect" class="form-label fw-bold">
-                                <i class="fas fa-map-marker-alt me-2"></i>Select a Port to View Foodie Information:
+                                <i class="fas fa-map-marker-alt me-2"></i><span th:text="#{foodie.selectPort}">Select a Port to View Foodie Information:</span>
                             </label>
                             <select id="foodiePortSelect" class="form-select form-select-lg">
-                                <option value="">-- Select a Port --</option>
+                                <option value="" th:text="#{ports.selectPortPlaceholder}">-- Select a Port --</option>
                                 <!-- Ports will be loaded dynamically from database -->
                             </select>
                         </div>
@@ -191,7 +445,7 @@
                         <div class="card h-100">
                             <div class="card-header bg-primary text-white">
                                 <h5 class="mb-0">
-                                    <i class="fas fa-drumstick-bite me-2"></i>Main Dish
+                                    <i class="fas fa-drumstick-bite me-2"></i><span th:text="#{foodie.mainDish}">Main Dish</span>
                                 </h5>
                             </div>
                             <div class="card-body">
@@ -204,7 +458,7 @@
                         <div class="card h-100">
                             <div class="card-header bg-warning text-dark">
                                 <h5 class="mb-0">
-                                    <i class="fas fa-birthday-cake me-2"></i>Dessert
+                                    <i class="fas fa-birthday-cake me-2"></i><span th:text="#{foodie.dessert}">Dessert</span>
                                 </h5>
                             </div>
                             <div class="card-body">
@@ -217,7 +471,7 @@
             </div>
             
             <div id="foodieNoData" class="text-center text-muted" style="display: none;">
-                <p><i class="fas fa-info-circle me-2"></i>No foodie information available for the selected port.</p>
+                <p><i class="fas fa-info-circle me-2"></i><span th:text="#{foodie.noData}">No foodie information available for the selected port.</span></p>
             </div>
         </div>
     </section>
@@ -227,8 +481,8 @@
         <div class="container">
             <div class="row text-center mb-5">
                 <div class="col-12">
-                    <h2 class="display-5 fw-bold">Key Features</h2>
-                    <p class="lead">Comprehensive solutions for the cruise tourism ecosystem</p>
+                    <h2 class="display-5 fw-bold" th:text="#{features.title}">Key Features</h2>
+                    <p class="lead" th:text="#{features.subtitle}">Comprehensive solutions for the cruise tourism ecosystem</p>
                 </div>
             </div>
             <div class="row g-4">
@@ -236,8 +490,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-brain fa-3x text-primary mb-3"></i>
-                            <h5 class="card-title">AI-Powered Recommendations</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.aiRecommendations}">AI-Powered Recommendations</h5>
+                            <p class="card-text" th:text="#{features.aiDescription}">
                                 Machine learning algorithms provide personalized suggestions for attractions, 
                                 restaurants, and activities based on user preferences and behavior.
                             </p>
@@ -248,8 +502,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-broadcast-tower fa-3x text-success mb-3"></i>
-                            <h5 class="card-title">Real-time Notifications</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.realTimeNotifications}">Real-time Notifications</h5>
+                            <p class="card-text" th:text="#{features.realTimeDescription}">
                                 Publisher-subscriber system enables instant communication between 
                                 cruise passengers and local businesses.
                             </p>
@@ -260,8 +514,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-project-diagram fa-3x text-warning mb-3"></i>
-                            <h5 class="card-title">Knowledge Graph Integration</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.knowledgeGraph}">Knowledge Graph Integration</h5>
+                            <p class="card-text" th:text="#{features.knowledgeGraphDescription}">
                                 RDF/SPARQL-based semantic data processing for enhanced 
                                 recommendation accuracy and context understanding.
                             </p>
@@ -272,8 +526,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-ship fa-3x text-info mb-3"></i>
-                            <h5 class="card-title">Cruise Ship Integration</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.cruiseShipIntegration}">Cruise Ship Integration</h5>
+                            <p class="card-text" th:text="#{features.cruiseShipDescription}">
                                 Automated port arrival notifications and capacity planning 
                                 for optimal passenger experience.
                             </p>
@@ -284,8 +538,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-chart-line fa-3x text-danger mb-3"></i>
-                            <h5 class="card-title">Business Intelligence</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.businessIntelligence}">Business Intelligence</h5>
+                            <p class="card-text" th:text="#{features.businessIntelligenceDescription}">
                                 Analytics dashboard for local businesses and port authorities 
                                 to track performance and optimize operations.
                             </p>
@@ -296,8 +550,8 @@
                     <div class="card feature-card h-100 text-center p-4">
                         <div class="card-body">
                             <i class="fas fa-shield-alt fa-3x text-secondary mb-3"></i>
-                            <h5 class="card-title">Security & Privacy</h5>
-                            <p class="card-text">
+                            <h5 class="card-title" th:text="#{features.securityPrivacy}">Security & Privacy</h5>
+                            <p class="card-text" th:text="#{features.securityPrivacyDescription}">
                                 GDPR-compliant data handling and user privacy protection 
                                 with JWT authentication and encryption.
                             </p>
@@ -317,28 +571,28 @@
                         <i class="fas fa-map-marker-alt fa-3x text-primary"></i>
                     </div>
                     <h3 class="fw-bold" id="statsPorts">400+</h3>
-                    <p class="text-muted">Cruise Ports</p>
+                    <p class="text-muted" th:text="#{stats.ports}">Cruise Ports</p>
                 </div>
                 <div class="col-md-3">
                     <div class="mb-3">
                         <i class="fas fa-utensils fa-3x text-success"></i>
                     </div>
                     <h3 class="fw-bold">50+</h3>
-                    <p class="text-muted">Restaurants & Attractions</p>
+                    <p class="text-muted" th:text="#{stats.restaurants}">Restaurants & Attractions</p>
                 </div>
                 <div class="col-md-3">
                     <div class="mb-3">
                         <i class="fas fa-users fa-3x text-warning"></i>
                     </div>
                     <h3 class="fw-bold">1000+</h3>
-                    <p class="text-muted">Potential Users</p>
+                    <p class="text-muted" th:text="#{stats.users}">Potential Users</p>
                 </div>
                 <div class="col-md-3">
                     <div class="mb-3">
                         <i class="fas fa-clock fa-3x text-info"></i>
                     </div>
                     <h3 class="fw-bold">24/7</h3>
-                    <p class="text-muted">Real-time Updates</p>
+                    <p class="text-muted" th:text="#{stats.realTime}">Real-time Updates</p>
                 </div>
             </div>
         </div>
@@ -349,54 +603,168 @@
         <div class="container">
             <div class="row text-center mb-5">
                 <div class="col-12">
-                    <h2 class="display-5 fw-bold">Technology Stack</h2>
-                    <p class="lead">Built with modern, scalable technologies</p>
+                    <h2 class="display-5 fw-bold" th:text="#{tech.title}">Technology Stack</h2>
+                    <p class="lead" th:text="#{tech.subtitle}">Built with modern, scalable technologies</p>
                 </div>
             </div>
             <div class="row g-4">
                 <div class="col-md-3 text-center">
                     <i class="fab fa-java fa-3x text-primary mb-3"></i>
-                    <h6>Java 17</h6>
-                    <small class="text-muted">Runtime Environment</small>
+                    <h6 th:text="#{tech.java}">Java 17</h6>
+                    <small class="text-muted" th:text="#{tech.javaDesc}">Runtime Environment</small>
                 </div>
                 <div class="col-md-3 text-center">
                     <i class="fas fa-leaf fa-3x text-success mb-3"></i>
-                    <h6>Spring Boot</h6>
-                    <small class="text-muted">Application Framework</small>
+                    <h6 th:text="#{tech.springBoot}">Spring Boot</h6>
+                    <small class="text-muted" th:text="#{tech.springBootDesc}">Application Framework</small>
                 </div>
                 <div class="col-md-3 text-center">
                     <i class="fas fa-database fa-3x text-warning mb-3"></i>
-                    <h6>MySQL 8.0</h6>
-                    <small class="text-muted">Database</small>
+                    <h6 th:text="#{tech.mysql}">MySQL 8.0</h6>
+                    <small class="text-muted" th:text="#{tech.mysqlDesc}">Database</small>
                 </div>
                 <div class="col-md-3 text-center">
                     <i class="fas fa-memory fa-3x text-danger mb-3"></i>
-                    <h6>Redis</h6>
-                    <small class="text-muted">Caching</small>
+                    <h6 th:text="#{tech.redis}">Redis</h6>
+                    <small class="text-muted" th:text="#{tech.redisDesc}">Caching</small>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel">
+                        <i class="fas fa-ship me-2"></i>Login
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="loginErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                    
+                    <form id="loginModalForm">
+                        <div class="mb-3">
+                            <label for="loginEmail" class="form-label">Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                <input type="email" class="form-control" id="loginEmail" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                <input type="password" class="form-control" id="loginPassword" required>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </button>
+                    </form>
+                    
+                    <hr class="my-3">
+                    
+                    <div class="text-center mb-3">
+                        <p class="text-muted mb-2">Or login with:</p>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary" onclick="loginWithFacebook()">
+                                <i class="fab fa-facebook me-2"></i>Facebook
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="loginWithTwitter()">
+                                <i class="fab fa-twitter me-2"></i>Twitter
+                            </button>
+                            <button type="button" class="btn btn-outline-dark" onclick="loginWithTikTok()">
+                                <i class="fab fa-tiktok me-2"></i>TikTok
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-3">
+                    
+                    <div class="text-center">
+                        <p class="text-muted mb-2">Don't have an account?</p>
+                        <button type="button" class="btn btn-outline-secondary w-100" onclick="showRegisterModal()">
+                            <i class="fas fa-user-plus me-2"></i>Register New User
+                        </button>
+                    </div>
+                    
+                    <!-- Registration Form (initially hidden) -->
+                    <div id="registerModalForm" style="display: none; margin-top: 20px;">
+                        <hr>
+                        <h6 class="mb-3">Register New User</h6>
+                        <div id="registerModalErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                        <div id="registerModalSuccessMessage" class="alert alert-success" style="display: none;"></div>
+                        
+                        <form id="registerModalFormFields">
+                            <div class="mb-3">
+                                <label for="regModalFirstName" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="regModalFirstName" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="regModalLastName" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="regModalLastName" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="regModalEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="regModalEmail" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="regModalPassword" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="regModalPassword" required minlength="6">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="regModalRole" class="form-label">Role</label>
+                                <select class="form-select" id="regModalRole">
+                                    <option value="USER">User</option>
+                                    <option value="ADMIN">Admin</option>
+                                </select>
+                                <small class="form-text text-muted">Note: Admin role grants access to maintenance panel</small>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-user-plus me-2"></i>Register
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="hideRegisterModal()">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Footer -->
     <footer class="bg-dark text-light py-4">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <h5><i class="fas fa-ship me-2"></i>Social Web Recommender</h5>
-                    <p class="mb-0">Enhancing cruise tourism through intelligent recommendations</p>
+                    <h5><i class="fas fa-ship me-2"></i><span th:text="#{footer.title}">Social Web Recommender</span></h5>
+                    <p class="mb-0" th:text="#{footer.description}">Enhancing cruise tourism through intelligent recommendations</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <p class="mb-0">
-                        <a href="/swagger-ui.html" class="text-light me-3">API Documentation</a>
-                        <a href="/actuator/health" class="text-light">Health Check</a>
+                        <a th:href="@{/swagger-ui.html}" href="/api/v1/swagger-ui.html" class="text-light me-3" th:text="#{nav.apiDocs}">API Documentation</a>
+                        <a th:href="@{/actuator/health}" href="/api/v1/actuator/health" class="text-light" th:text="#{nav.health}">Health Check</a>
                     </p>
                 </div>
             </div>
             <hr class="my-3">
             <div class="row">
                 <div class="col-12 text-center">
-                    <p class="mb-0">&copy; 2024 Social Web Recommender Team. All rights reserved.</p>
+                    <p class="mb-0" th:text="#{footer.copyright}">&copy; 2024 Social Web Recommender Team. All rights reserved.</p>
                 </div>
             </div>
         </div>
@@ -781,7 +1149,768 @@
         // Initialize: Load ports from database when page loads
         window.addEventListener('DOMContentLoaded', function() {
             loadPortsFromDatabase();
+            checkLoginStatus();
         });
+        
+        // Get auth headers for API calls
+        function getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+                console.log('Token found in localStorage, adding to Authorization header');
+            } else {
+                console.warn('No token found in localStorage');
+            }
+            return headers;
+        }
+        
+        // Login Modal Functions
+        function showLoginModal() {
+            const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+            modal.show();
+        }
+        
+        function showRegisterModal() {
+            document.getElementById('registerModalForm').style.display = 'block';
+            document.getElementById('loginModalForm').style.display = 'none';
+        }
+        
+        function hideRegisterModal() {
+            document.getElementById('registerModalForm').style.display = 'none';
+            document.getElementById('loginModalForm').style.display = 'block';
+            document.getElementById('registerModalFormFields').reset();
+            document.getElementById('registerModalErrorMessage').style.display = 'none';
+            document.getElementById('registerModalSuccessMessage').style.display = 'none';
+        }
+        
+        // Check if user is logged in
+        function checkLoginStatus() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                // Try to get user info
+                fetch(`${getBasePath()}/auth/me`, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    return null;
+                })
+                .then(user => {
+                    if (user) {
+                        showUserInterface(user);
+                    } else {
+                        // Token invalid, clear it
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        // Reset UI to public view
+                        document.getElementById('heroSection').style.display = 'block';
+                        document.getElementById('myInterestsNavItem').style.display = 'none';
+                        document.getElementById('myPersonalInterests').style.display = 'none';
+                        document.getElementById('userRecommendations').style.display = 'none';
+                    }
+                })
+                .catch(() => {
+                    // Error fetching user info
+                });
+            } else {
+                // Not logged in - ensure public view
+                document.getElementById('heroSection').style.display = 'block';
+                document.getElementById('myInterestsNavItem').style.display = 'none';
+                document.getElementById('myPersonalInterests').style.display = 'none';
+                document.getElementById('userRecommendations').style.display = 'none';
+            }
+        }
+        
+        // Show user interface after login
+        function showUserInterface(user) {
+            // Hide login button, show user menu
+            document.getElementById('loginNavItem').style.display = 'none';
+            document.getElementById('userNavItem').style.display = 'block';
+            document.getElementById('userNavName').textContent = user.firstName || user.email;
+            
+            // Store user info
+            localStorage.setItem('user', JSON.stringify(user));
+            
+            // Show sections based on role
+            if (user.role === 'USER') {
+                // Hide hero section for USER role
+                document.getElementById('heroSection').style.display = 'none';
+                
+                // Show "My Interests" navigation link
+                document.getElementById('myInterestsNavItem').style.display = 'block';
+                
+                // Show interests section first (replaces hero section)
+                document.getElementById('myPersonalInterests').style.display = 'block';
+                
+                // Show user recommendations section
+                document.getElementById('userRecommendations').style.display = 'block';
+                document.getElementById('userName').textContent = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+                
+                // Keep other sections visible (ports, foodie, features)
+                // They will appear in order after userRecommendations
+                
+                // Scroll to top to show personalized welcome
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+                // Load ports for user recommendations dropdown
+                loadPortsForUserRecommendations();
+                
+                // Load saved interests
+                loadSavedInterests();
+            } else {
+                // ADMIN users don't see these sections
+                document.getElementById('heroSection').style.display = 'block';
+                document.getElementById('myInterestsNavItem').style.display = 'none';
+                document.getElementById('myPersonalInterests').style.display = 'none';
+                document.getElementById('userRecommendations').style.display = 'none';
+            }
+        }
+        
+        // Load ports for user recommendations dropdown
+        function loadPortsForUserRecommendations() {
+            const basePath = getBasePath();
+            fetch(`${basePath}/ports`)
+                .then(response => response.json())
+                .then(ports => {
+                    const select = document.getElementById('userPortSelect');
+                    select.innerHTML = '<option value="">-- Select a Port --</option>';
+                    ports.forEach(port => {
+                        const option = document.createElement('option');
+                        option.value = port.id;
+                        option.textContent = `${port.name} (${port.portCode || 'N/A'}) - ${port.country || 'Unknown'}`;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading ports for user recommendations:', error);
+                });
+        }
+        
+        // Handle login form submission
+        document.getElementById('loginModalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginErrorMessage');
+            errorDiv.style.display = 'none';
+            
+            try {
+                const basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Store token in localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data));
+                    
+                    // Set cookie manually as fallback
+                    document.cookie = `token=${data.token}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                    document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                    
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+                    
+                    // Handle redirect based on role
+                    if (data.role === 'ADMIN') {
+                        // Open admin maintenance in a new window
+                        const currentPort = window.location.port;
+                        let adminUrl;
+                        if (currentPort === '63342' || currentPort === '') {
+                            adminUrl = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                        } else {
+                            adminUrl = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                        }
+                        window.open(adminUrl, '_blank', 'width=1400,height=900');
+                    } else {
+                        // Show user interface on current page
+                        showUserInterface(data);
+                    }
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Invalid email or password';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Login failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        
+        // Handle registration form submission
+        document.getElementById('registerModalFormFields').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const registerData = {
+                firstName: document.getElementById('regModalFirstName').value,
+                lastName: document.getElementById('regModalLastName').value,
+                email: document.getElementById('regModalEmail').value,
+                password: document.getElementById('regModalPassword').value,
+                role: document.getElementById('regModalRole').value
+            };
+            
+            const errorDiv = document.getElementById('registerModalErrorMessage');
+            const successDiv = document.getElementById('registerModalSuccessMessage');
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            try {
+                const basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(registerData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    successDiv.textContent = `User registered successfully! Role: ${data.role}. You can now login.`;
+                    successDiv.style.display = 'block';
+                    
+                    // Auto-fill login form
+                    document.getElementById('loginEmail').value = registerData.email;
+                    
+                    // Hide register form after 2 seconds
+                    setTimeout(() => {
+                        hideRegisterModal();
+                    }, 2000);
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Registration failed. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Registration failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        
+        // Handle user port selection for recommendations
+        document.getElementById('userPortSelect').addEventListener('change', function() {
+            const portId = this.value;
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!portId || !user.userId) {
+                document.getElementById('userRecommendationsContent').style.display = 'none';
+                return;
+            }
+            
+            loadUserRecommendations(user.userId, portId);
+        });
+        
+        // Load user recommendations
+        async function loadUserRecommendations(userId, portId) {
+            const basePath = getBasePath();
+            
+            try {
+                // Get passenger ID (will auto-create if needed)
+                let passengerId = userId; // Fallback
+                
+                try {
+                    const passengerResponse = await fetch(`${basePath}/passengers?userId=${userId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (passengerResponse.ok) {
+                        const passengers = await passengerResponse.json();
+                        if (passengers && Array.isArray(passengers) && passengers.length > 0) {
+                            passengerId = passengers[0].id;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not fetch passengers, using userId:', e);
+                }
+                
+                // Load port details for map and foodie
+                let port = null;
+                try {
+                    const portResponse = await fetch(`${basePath}/ports/${portId}`);
+                    if (portResponse.ok) {
+                        port = await portResponse.json();
+                        
+                        // Display map
+                        if (port.latitude && port.longitude) {
+                            displayUserPortMap(port);
+                        }
+                        
+                        // Display foodie details
+                        if (port.foodieMain || port.foodieDessert) {
+                            displayUserFoodieDetails(port);
+                        } else {
+                            document.getElementById('userFoodieSection').style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading port details:', e);
+                }
+                
+                // Load shore excursions
+                try {
+                    const excursionsResponse = await fetch(`${basePath}/passengers/${passengerId}/shore-excursions?portId=${portId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (excursionsResponse.ok) {
+                        const excursions = await excursionsResponse.json();
+                        displayShoreExcursions(excursions);
+                    } else {
+                        document.getElementById('shoreExcursionsContent').innerHTML = '<p class="text-muted">No shore excursions available.</p>';
+                    }
+                } catch (e) {
+                    console.error('Error loading shore excursions:', e);
+                    document.getElementById('shoreExcursionsContent').innerHTML = '<p class="text-muted">Error loading shore excursions.</p>';
+                }
+                
+                // Load meal venues
+                try {
+                    const mealsResponse = await fetch(`${basePath}/passengers/${passengerId}/lunch-venues?portId=${portId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (mealsResponse.ok) {
+                        const meals = await mealsResponse.json();
+                        displayMealVenues(meals);
+                    } else {
+                        document.getElementById('mealVenuesContent').innerHTML = '<p class="text-muted">No meal venues available.</p>';
+                    }
+                } catch (e) {
+                    console.error('Error loading meal venues:', e);
+                    document.getElementById('mealVenuesContent').innerHTML = '<p class="text-muted">Error loading meal venues.</p>';
+                }
+                
+                document.getElementById('userRecommendationsContent').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading user recommendations:', error);
+                document.getElementById('shoreExcursionsContent').innerHTML = '<p class="text-danger">Error loading recommendations</p>';
+                document.getElementById('mealVenuesContent').innerHTML = '<p class="text-danger">Error loading recommendations</p>';
+            }
+        }
+        
+        // Display port map for user recommendations
+        let userPortMap = null;
+        function displayUserPortMap(port) {
+            const mapDiv = document.getElementById('userPortMap');
+            if (!mapDiv) return;
+            
+            // Clear existing map
+            if (userPortMap) {
+                userPortMap.remove();
+                userPortMap = null;
+            }
+            
+            if (!port.latitude || !port.longitude) {
+                mapDiv.innerHTML = '<p class="text-muted">Map coordinates not available for this port.</p>';
+                return;
+            }
+            
+            // Create new map
+            userPortMap = L.map('userPortMap').setView([port.latitude, port.longitude], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(userPortMap);
+            
+            // Add marker
+            const marker = L.marker([port.latitude, port.longitude]).addTo(userPortMap);
+            marker.bindPopup(`<b>${port.name}</b><br>${port.country || ''}`).openPopup();
+        }
+        
+        // Display foodie details for user recommendations
+        function displayUserFoodieDetails(port) {
+            const foodieSection = document.getElementById('userFoodieSection');
+            if (!foodieSection) return;
+            
+            foodieSection.style.display = 'block';
+            
+            // Parse and display foodie_main
+            if (port.foodieMain) {
+                try {
+                    const foodieMain = typeof port.foodieMain === 'string' ? JSON.parse(port.foodieMain) : port.foodieMain;
+                    document.getElementById('userFoodieMainName').textContent = foodieMain.name || 'Local Specialty';
+                    document.getElementById('userFoodieMainRecipe').textContent = foodieMain.recipe || foodieMain.description || 'No recipe available.';
+                } catch (e) {
+                    document.getElementById('userFoodieMainName').textContent = 'Local Specialty';
+                    document.getElementById('userFoodieMainRecipe').textContent = port.foodieMain;
+                }
+            } else {
+                document.getElementById('userFoodieMainName').textContent = 'Not Available';
+                document.getElementById('userFoodieMainRecipe').textContent = 'No main dish information available for this port.';
+            }
+            
+            // Parse and display foodie_dessert
+            if (port.foodieDessert) {
+                try {
+                    const foodieDessert = typeof port.foodieDessert === 'string' ? JSON.parse(port.foodieDessert) : port.foodieDessert;
+                    document.getElementById('userFoodieDessertName').textContent = foodieDessert.name || 'Local Dessert';
+                    document.getElementById('userFoodieDessertRecipe').textContent = foodieDessert.recipe || foodieDessert.description || 'No recipe available.';
+                } catch (e) {
+                    document.getElementById('userFoodieDessertName').textContent = 'Local Dessert';
+                    document.getElementById('userFoodieDessertRecipe').textContent = port.foodieDessert;
+                }
+            } else {
+                document.getElementById('userFoodieDessertName').textContent = 'Not Available';
+                document.getElementById('userFoodieDessertRecipe').textContent = 'No dessert information available for this port.';
+            }
+        }
+        
+        // Display shore excursions
+        function displayShoreExcursions(excursions) {
+            const content = document.getElementById('shoreExcursionsContent');
+            if (!excursions || excursions.length === 0) {
+                content.innerHTML = '<p class="text-muted">No shore excursions available for this port.</p>';
+                return;
+            }
+            
+            let html = '<ul class="list-group list-group-flush">';
+            excursions.slice(0, 5).forEach(excursion => {
+                const name = excursion.name || excursion.excursionName || 'Shore Excursion';
+                const desc = excursion.description || excursion.excursionDescription || '';
+                const duration = excursion.duration || '';
+                html += `
+                    <li class="list-group-item">
+                        <h6>${name}</h6>
+                        ${desc ? `<p class="mb-1 small text-muted">${desc}</p>` : ''}
+                        ${duration ? `<small class="text-muted"><i class="fas fa-clock me-1"></i>${duration}</small>` : ''}
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            content.innerHTML = html;
+        }
+        
+        // Display meal venues
+        function displayMealVenues(meals) {
+            const content = document.getElementById('mealVenuesContent');
+            if (!meals || meals.length === 0) {
+                content.innerHTML = '<p class="text-muted">No meal venues available for this port.</p>';
+                return;
+            }
+            
+            let html = '<ul class="list-group list-group-flush">';
+            meals.slice(0, 5).forEach(meal => {
+                const name = meal.name || meal.venueName || 'Meal Venue';
+                const desc = meal.description || meal.venueDescription || '';
+                const cuisine = meal.cuisineType || '';
+                html += `
+                    <li class="list-group-item">
+                        <h6>${name}</h6>
+                        ${desc ? `<p class="mb-1 small text-muted">${desc}</p>` : ''}
+                        ${cuisine ? `<small class="text-muted"><i class="fas fa-utensils me-1"></i>${cuisine}</small>` : ''}
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            content.innerHTML = html;
+        }
+        
+        // Logout function
+        async function logout() {
+            try {
+                const basePath = getBasePath();
+                await fetch(`${basePath}/auth/logout`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            
+            // Clear client-side storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            // Clear cookies
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            document.cookie = 'token=; path=/api/v1; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            
+            // Hide user interface, show login button
+            document.getElementById('loginNavItem').style.display = 'block';
+            document.getElementById('userNavItem').style.display = 'none';
+            document.getElementById('myInterestsNavItem').style.display = 'none';
+            document.getElementById('heroSection').style.display = 'block';
+            document.getElementById('userRecommendations').style.display = 'none';
+            document.getElementById('userRecommendationsContent').style.display = 'none';
+            document.getElementById('myPersonalInterests').style.display = 'none';
+        }
+        
+        // Social Login Functions (Placeholder - requires OAuth implementation)
+        function loginWithFacebook() {
+            alert('Facebook login will be implemented. For now, please use email/password login.');
+            // TODO: Implement Facebook OAuth
+            // window.location.href = '/auth/facebook';
+        }
+        
+        function loginWithTwitter() {
+            alert('Twitter login will be implemented. For now, please use email/password login.');
+            // TODO: Implement Twitter OAuth
+            // window.location.href = '/auth/twitter';
+        }
+        
+        function loginWithTikTok() {
+            alert('TikTok login will be implemented. For now, please use email/password login.');
+            // TODO: Implement TikTok OAuth
+            // window.location.href = '/auth/tiktok';
+        }
+        
+        // Load saved interests
+        async function loadSavedInterests() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.userId) return;
+            
+            try {
+                const basePath = getBasePath();
+                
+                // Get passenger ID
+                let passengerId = user.userId;
+                try {
+                    const passengerResponse = await fetch(`${basePath}/passengers?userId=${user.userId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (passengerResponse.ok) {
+                        const passengers = await passengerResponse.json();
+                        if (passengers && Array.isArray(passengers) && passengers.length > 0) {
+                            passengerId = passengers[0].id;
+                        } else {
+                            // No passenger found, can't load interests
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not fetch passengers:', e);
+                    return;
+                }
+                
+                // Load interests
+                const interestsResponse = await fetch(`${basePath}/passengers/${passengerId}/interests`, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                if (interestsResponse.ok) {
+                    const interests = await interestsResponse.json();
+                    displaySavedInterests(interests);
+                    
+                    // Group interests by category and populate form fields
+                    const interestsByCategory = {};
+                    interests.forEach(interest => {
+                        if (!interestsByCategory[interest.category]) {
+                            interestsByCategory[interest.category] = [];
+                        }
+                        interestsByCategory[interest.category].push(interest.keyword);
+                    });
+                    
+                    // Populate form fields
+                    if (interestsByCategory['CRUISE_SHIP']) {
+                        document.getElementById('cruiseShipInterests').value = interestsByCategory['CRUISE_SHIP'].join(', ');
+                    }
+                    if (interestsByCategory['PORT']) {
+                        document.getElementById('portInterests').value = interestsByCategory['PORT'].join(', ');
+                    }
+                    if (interestsByCategory['ACTIVITY']) {
+                        document.getElementById('activityInterests').value = interestsByCategory['ACTIVITY'].join(', ');
+                    }
+                    if (interestsByCategory['ATTRACTION']) {
+                        document.getElementById('attractionInterests').value = interestsByCategory['ATTRACTION'].join(', ');
+                    }
+                    if (interestsByCategory['MEAL_VENUE']) {
+                        document.getElementById('mealVenueInterests').value = interestsByCategory['MEAL_VENUE'].join(', ');
+                    }
+                    if (interestsByCategory['RESTAURANT']) {
+                        document.getElementById('restaurantInterests').value = interestsByCategory['RESTAURANT'].join(', ');
+                    }
+                    if (interestsByCategory['EXCURSION']) {
+                        document.getElementById('excursionInterests').value = interestsByCategory['EXCURSION'].join(', ');
+                    }
+                    if (interestsByCategory['GENERAL']) {
+                        document.getElementById('generalInterests').value = interestsByCategory['GENERAL'].join(', ');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading saved interests:', error);
+            }
+        }
+        
+        // Display saved interests
+        function displaySavedInterests(interests) {
+            const listDiv = document.getElementById('savedInterestsList');
+            
+            if (!interests || interests.length === 0) {
+                listDiv.innerHTML = '<p class="text-muted">No interests saved yet. Set your preferences and click "Save My Interests".</p>';
+                return;
+            }
+            
+            // Group by category
+            const byCategory = {};
+            interests.forEach(interest => {
+                if (!byCategory[interest.category]) {
+                    byCategory[interest.category] = [];
+                }
+                byCategory[interest.category].push(interest.keyword);
+            });
+            
+            let html = '<div class="list-group">';
+            Object.keys(byCategory).forEach(category => {
+                html += `<div class="list-group-item"><strong>${category}:</strong> `;
+                html += byCategory[category].join(', ');
+                html += '</div>';
+            });
+            html += '</div>';
+            
+            listDiv.innerHTML = html;
+        }
+        
+        // Save interests
+        async function saveInterests() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.userId) {
+                alert('Please login first');
+                return;
+            }
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('No authentication token found. Please login again.');
+                window.location.reload();
+                return;
+            }
+            
+            try {
+                const basePath = getBasePath();
+                const authHeaders = getAuthHeaders();
+                
+                console.log('Saving interests for user:', user.userId);
+                console.log('Auth headers:', authHeaders);
+                console.log('Token from localStorage:', token ? token.substring(0, 20) + '...' : 'null');
+                console.log('Full token:', token);
+                
+                // Get passenger ID (will auto-create if needed)
+                let passengerId = user.userId;
+                try {
+                    const passengerResponse = await fetch(`${basePath}/passengers?userId=${user.userId}`, {
+                        headers: authHeaders,
+                        credentials: 'include'
+                    });
+                    
+                    console.log('Passenger response status:', passengerResponse.status);
+                    
+                    if (passengerResponse.ok) {
+                        const passengers = await passengerResponse.json();
+                        console.log('Passengers received:', passengers);
+                        if (passengers && Array.isArray(passengers) && passengers.length > 0) {
+                            passengerId = passengers[0].id;
+                            console.log('Using passenger ID:', passengerId);
+                        } else {
+                            // Passenger will be auto-created by the endpoint, try again
+                            console.log('No passengers found, retrying...');
+                            const retryResponse = await fetch(`${basePath}/passengers?userId=${user.userId}`, {
+                                headers: authHeaders,
+                                credentials: 'include'
+                            });
+                            if (retryResponse.ok) {
+                                const retryPassengers = await retryResponse.json();
+                                if (retryPassengers && Array.isArray(retryPassengers) && retryPassengers.length > 0) {
+                                    passengerId = retryPassengers[0].id;
+                                    console.log('Passenger created with ID:', passengerId);
+                                } else {
+                                    const errorText = await retryResponse.text();
+                                    alert('Unable to create passenger profile. Please try again. Error: ' + errorText);
+                                    return;
+                                }
+                            } else {
+                                const errorText = await retryResponse.text();
+                                console.error('Retry failed:', retryResponse.status, errorText);
+                                alert(`Unable to create passenger profile (${retryResponse.status}). Please try logging out and back in.`);
+                                return;
+                            }
+                        }
+                    } else {
+                        const errorText = await passengerResponse.text();
+                        console.error('Passenger fetch failed:', passengerResponse.status, errorText);
+                        alert(`Error fetching passenger profile (${passengerResponse.status}): ${errorText.substring(0, 200)}`);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Could not fetch passengers:', e);
+                    alert('Error: Could not find passenger profile. ' + e.message);
+                    return;
+                }
+                
+                // Collect interests from form
+                const interests = [];
+                
+                // Helper function to add interests
+                const addInterests = (category, value) => {
+                    if (value && value.trim()) {
+                        value.split(',').forEach(keyword => {
+                            const trimmed = keyword.trim();
+                            if (trimmed) {
+                                interests.push({ category, keyword: trimmed });
+                            }
+                        });
+                    }
+                };
+                
+                addInterests('CRUISE_SHIP', document.getElementById('cruiseShipInterests').value);
+                addInterests('PORT', document.getElementById('portInterests').value);
+                addInterests('ACTIVITY', document.getElementById('activityInterests').value);
+                addInterests('ATTRACTION', document.getElementById('attractionInterests').value);
+                addInterests('MEAL_VENUE', document.getElementById('mealVenueInterests').value);
+                addInterests('RESTAURANT', document.getElementById('restaurantInterests').value);
+                addInterests('EXCURSION', document.getElementById('excursionInterests').value);
+                addInterests('GENERAL', document.getElementById('generalInterests').value);
+                
+                // Save interests
+                console.log('Saving interests:', interests);
+                const response = await fetch(`${basePath}/passengers/${passengerId}/interests`, {
+                    method: 'POST',
+                    headers: authHeaders,
+                    credentials: 'include',
+                    body: JSON.stringify(interests)
+                });
+                
+                console.log('Save interests response status:', response.status);
+                
+                if (response.ok) {
+                    const savedInterests = await response.json();
+                    displaySavedInterests(savedInterests);
+                    alert('Your interests have been saved successfully!');
+                } else {
+                    const error = await response.text();
+                    console.error('Error saving interests:', response.status, error);
+                    if (response.status === 403) {
+                        alert('Access denied (403). Your session may have expired. Please try logging out and back in.');
+                    } else {
+                        alert(`Error saving interests (${response.status}): ${error.substring(0, 200)}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving interests:', error);
+                alert('Error saving interests: ' + error.message);
+            }
+        }
     </script>
 </body>
 </html>

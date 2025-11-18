@@ -31,25 +31,36 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
+        String requestPath = request.getRequestURI();
+        log.debug("Processing request: {} {}", request.getMethod(), requestPath);
+        
         try {
             String jwt = getJwtFromRequest(request);
             
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String email = tokenProvider.getEmailFromToken(jwt);
-                
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                
-                log.debug("Authenticated user: {} with authorities: {}", email, userDetails.getAuthorities());
+            if (StringUtils.hasText(jwt)) {
+                log.debug("JWT token found in request");
+                if (tokenProvider.validateToken(jwt)) {
+                    log.debug("JWT token is valid");
+                    String email = tokenProvider.getEmailFromToken(jwt);
+                    log.debug("Extracted email from token: {}", email);
+                    
+                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    
+                    log.info("Authenticated user: {} with authorities: {} for path: {}", 
+                            email, userDetails.getAuthorities(), requestPath);
+                } else {
+                    log.warn("Invalid JWT token for request: {} {}", request.getMethod(), requestPath);
+                }
             } else {
-                log.debug("No valid JWT token found for request: {} {}", request.getMethod(), request.getRequestURI());
+                log.debug("No JWT token found for request: {} {}", request.getMethod(), requestPath);
             }
         } catch (Exception ex) {
-            log.error("Could not set user authentication in security context", ex);
+            log.error("Could not set user authentication in security context for path: {}", requestPath, ex);
         }
         
         filterChain.doFilter(request, response);
@@ -59,12 +70,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // First check Authorization header
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
+            String token = bearerToken.substring(7);
+            log.debug("Found JWT token in Authorization header");
+            return token;
         }
         
         // Check for token in query parameter (fallback for cookie issues)
         String tokenParam = request.getParameter("token");
         if (StringUtils.hasText(tokenParam)) {
+            log.debug("Found JWT token in query parameter");
             return tokenParam;
         }
         
@@ -73,11 +87,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (cookies != null) {
             for (jakarta.servlet.http.Cookie cookie : cookies) {
                 if ("token".equals(cookie.getName())) {
+                    log.debug("Found JWT token in cookie");
                     return cookie.getValue();
                 }
             }
         }
         
+        log.debug("No JWT token found in request");
         return null;
     }
 }

@@ -130,10 +130,21 @@
         function getBasePath() {
             const hostname = window.location.hostname;
             const port = window.location.port;
+            const pathname = window.location.pathname;
+            
+            // If served from IntelliJ's web server (port 63342), use full URL to Spring Boot
             if (port === '63342' || port === '') {
                 return 'http://localhost:8080/api/v1';
             }
-            return '';
+            
+            // If served from Spring Boot (port 8080), check if context path is in URL
+            // The context path is /api/v1
+            if (pathname.startsWith('/api/v1')) {
+                return '/api/v1';
+            }
+            
+            // Default: use context path
+            return '/api/v1';
         }
         
         function showRegisterForm() {
@@ -180,21 +191,24 @@
                     // Redirect based on role
                     if (data.role === 'ADMIN') {
                         // Redirect to Spring Boot server admin page
-                        // If served from IntelliJ (port 63342), use full URL to Spring Boot (port 8080)
+                        // Always use context path /api/v1
+                        const basePath = getBasePath();
                         const currentPort = window.location.port;
                         if (currentPort === '63342' || currentPort === '') {
                             // Add token as query parameter as fallback for cookie issues
                             window.location.href = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
                         } else {
-                            window.location.href = '/admin/maintenance';
+                            // Use context path for redirect
+                            window.location.href = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
                         }
                     } else {
                         // Regular users go to main page
+                        const basePath = getBasePath();
                         const currentPort = window.location.port;
                         if (currentPort === '63342' || currentPort === '') {
                             window.location.href = 'http://localhost:8080/api/v1/';
                         } else {
-                            window.location.href = '/';
+                            window.location.href = `${basePath}/`;
                         }
                     }
                 } else {

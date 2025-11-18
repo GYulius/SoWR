@@ -72,7 +72,9 @@ public class SecurityConfig {
                     "/passengers/**",
                     "/recommendations/**",
                     "/publishers/**",
-                    "/admin/**"
+                    "/admin/**",
+                    "/error",
+                    "/error/**"
                 )
             )
             .sessionManagement(session -> session
@@ -84,6 +86,9 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 
+                // Error endpoint - must be accessible for exception handling
+                .requestMatchers("/error", "/error/**").permitAll()
+                
                 // Auth endpoints - public (including logout)
                 .requestMatchers("/auth/**").permitAll()
                 
@@ -94,6 +99,12 @@ public class SecurityConfig {
                 // Public API endpoints (for frontend)
                 .requestMatchers("/ports/**").permitAll()
                 .requestMatchers("/dashboard/**").permitAll()
+                
+                // Passenger endpoints - require authentication (users can access their own passenger data)
+                .requestMatchers("/passengers/**").authenticated()
+                
+                // Recommendations endpoints - require authentication
+                .requestMatchers("/recommendations/**").authenticated()
                 
                 // Admin endpoints require ADMIN role
                 .requestMatchers("/admin/**", "/maintenance/**").hasRole("ADMIN")

@@ -1,5 +1,7 @@
 package com.cruise.recommender.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +25,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User {
     
     @Id
@@ -33,6 +36,7 @@ public class User {
     private String email;
     
     @Column(name = "password_hash", nullable = false)
+    @JsonIgnore
     private String passwordHash;
     
     @Column(name = "first_name", nullable = false)
@@ -78,22 +82,28 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Relationships
+    // Relationships - marked as JsonIgnore to prevent lazy loading issues during serialization
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Recommendation> recommendations;
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<UserInteraction> interactions;
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Subscription> subscriptions;
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Booking> bookings;
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Notification> notifications;
     
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Publisher publisher;
 }
