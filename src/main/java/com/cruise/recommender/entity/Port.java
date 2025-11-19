@@ -52,8 +52,8 @@ public class Port {
     @Column(nullable = false)
     private Double longitude;
     
-    @Column(nullable = false)
-    private Integer capacity;
+    @Column(name = "berths_capacity", nullable = false)
+    private Integer berthsCapacity;
     
     @Column(columnDefinition = "JSON")
     private String facilities;

@@ -25,7 +25,7 @@ public interface PortRepository extends JpaRepository<Port, Long> {
     
     Page<Port> findByCountry(String country, Pageable pageable);
     
-    @Query("SELECT p FROM Port p WHERE p.capacity >= :minCapacity ORDER BY p.capacity ASC")
+    @Query("SELECT p FROM Port p WHERE p.berthsCapacity >= :minCapacity ORDER BY p.berthsCapacity ASC")
     List<Port> findByMinCapacity(@Param("minCapacity") Integer minCapacity);
     
     @Query("SELECT p FROM Port p WHERE p.name LIKE %:name% OR p.city LIKE %:name%")

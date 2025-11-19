@@ -66,6 +66,11 @@
                         <a class="nav-link" href="#ports" th:text="#{nav.ports}">Ports</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#fleet-tracker">
+                            <i class="fas fa-ship me-1"></i>Fleet Tracker
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#foodie" th:text="#{nav.foodie}">Foodie</a>
                     </li>
                     <li class="nav-item">
@@ -406,6 +411,42 @@
             <div class="row" id="portCardsContainer">
                 <div class="col-12 text-center">
                     <p class="text-muted" th:text="#{ports.selectPortToView}">Select a port to view details</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Fleet Tracker Section -->
+    <section id="fleet-tracker" class="py-5 bg-light">
+        <div class="container">
+            <div class="row text-center mb-5">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold">
+                        <i class="fas fa-ship me-3"></i>Fleet Tracker
+                    </h2>
+                    <p class="lead">Track cruise ships in real-time using AIS data</p>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <script type="text/javascript">
+                                // Map appearance
+                                var width="50%";         // width in pixels or percentage
+                                var height="300";         // height in pixels
+                                var latitude="36.00";     // center latitude (decimal degrees)
+                                var longitude="-5.40";    // center longitude (decimal degrees)
+                                var names=true;           // always show ship names (defaults to false)
+
+                                // Fleet tracking
+                                var fleet="32d95ba7142bf60d814fe72fa0a0ee9d";
+                                var fleet_name="Default Fleet";
+                                var fleet_timespan="1440"; // maximum age in minutes of the displayed ship positions
+                            </script>
+                            <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -857,7 +898,7 @@
                             option.dataset.portName = port.name || 'Unknown';
                             option.dataset.country = port.country || '';
                             option.dataset.city = port.city || '';
-                            option.dataset.capacity = port.capacity || 0;
+                            option.dataset.capacity = port.berthsCapacity || 0;
                             portSelect.appendChild(option);
                             
                             // Also add to foodie dropdown
@@ -965,7 +1006,7 @@
                                 </p>
                                 <p class="card-text">
                                     <i class="fas fa-users me-2"></i>
-                                    <span>Capacity: ${port.capacity || 0}</span>
+                                    <span>Capacity: ${port.berthsCapacity || 0}</span>
                                 </p>
                                 <p class="card-text">
                                     <i class="fas fa-anchor me-2"></i>

@@ -114,7 +114,7 @@ public class DataInitializationService implements CommandLineRunner {
             
             Object capacityObj = portData.get("capacity");
             if (capacityObj != null) {
-                builder.capacity(convertToInteger(capacityObj));
+                builder.berthsCapacity(convertToInteger(capacityObj));
             }
             
             // Convert facilities and amenities to JSON strings
