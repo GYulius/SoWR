@@ -83,7 +83,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints (paths are relative to context-path /api/v1)
                 .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**", "/swagger-ui/index.html").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 
                 // Error endpoint - must be accessible for exception handling

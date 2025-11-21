@@ -320,22 +320,19 @@ jwt:
   expiration: 604800000
 
 # AIS Data Sources
-# Option 1: Open-AIS (Free - Recommended)
-openais:
-  enabled: true
-  api:
-    base:
-      url: http://localhost:9000
-
+# Option 1: VesselFinder (Free Account - DEFAULT FLEET with 10 ships)
 ais:
   data:
     source:
       api:
-        provider: OPENAIS  # Options: OPENAIS, MARINETRAFFIC, VESSELFINDER, AISHUB
+        url: https://www.vesselfinder.com/api
+        key: your_vesselfinder_api_key
+        provider: VESSELFINDER  # Options: VESSELFINDER, MARINETRAFFIC, AISHUB
     simulation:
       enabled: false
 
-# Option 2: Paid Providers (MarineTraffic, VesselFinder, etc.)
+# Option 2: Other Providers
+# MarineTraffic:
 # ais:
 #   data:
 #     source:
@@ -345,6 +342,11 @@ ais:
 #         provider: MARINETRAFFIC
 #     simulation:
 #       enabled: false
+
+# Open-AIS (DISABLED - Requires GitLab repository access)
+# See docs/OPENAIS_ALTERNATIVES.md for details
+openais:
+  enabled: false
 
 # Notification Services
 spring:

@@ -104,6 +104,10 @@
         <!-- Jackson for JSON processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
         
@@ -129,6 +133,13 @@
         </dependency>
         
         <!-- Apache Spark for Big Data Processing -->
+        <!-- Servlet API required by Spark -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.version}</artifactId>
@@ -290,13 +301,7 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
-                    <jvmArguments>
-                        -Dfile.encoding=UTF-8
-                        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-                        --add-opens=java.base/java.lang=ALL-UNNAMED
-                        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-                        --add-opens=java.base/java.io=ALL-UNNAMED
-                    </jvmArguments>
+                    <jvmArguments>-Dfile.encoding=UTF-8 --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED</jvmArguments>
                 </configuration>
             </plugin>
             

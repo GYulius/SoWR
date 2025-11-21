@@ -138,10 +138,21 @@ public class KnowledgeGraphSparkService {
                         sparkAvailable = false;
                     } catch (Throwable e) {
                         // Catch any other errors including LinkageError, etc.
+                        // Log the full exception to help diagnose the issue
+                        Throwable cause = e.getCause();
+                        String causeInfo = cause != null ? " (Caused by: " + cause.getClass().getSimpleName() + ": " + cause.getMessage() + ")" : "";
+                        
                         log.warn("Failed to initialize Spark session. Spark features will be disabled. " +
-                                "Error: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
+                                "Error: " + e.getClass().getSimpleName() + " - " + e.getMessage() + causeInfo +
                                 ". To enable Spark, add JVM arguments: " +
-                                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED");
+                                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED " +
+                                "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED");
+                        
+                        // Log full stack trace at debug level for troubleshooting
+                        if (log.isDebugEnabled()) {
+                            log.debug("Full Spark initialization exception:", e);
+                        }
+                        
                         sparkAvailable = false;
                     }
                 }

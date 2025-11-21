@@ -37,7 +37,7 @@ public class AisDataIngestionService {
     @Value("${ais.data.source.api.key:}")
     private String aisApiKey;
     
-    @Value("${ais.data.source.api.provider:MARINETRAFFIC}")
+    @Value("${ais.data.source.api.provider:VESSELFINDER}")
     private String aisProvider;
     
     @Value("${ais.data.simulation.enabled:false}")
@@ -65,15 +65,16 @@ public class AisDataIngestionService {
             if (simulationEnabled) {
                 // Generate simulated AIS data for testing
                 aisDataList = generateSimulatedAisData();
+            } else if (aisApiUrl != null && !aisApiUrl.isEmpty() && aisApiKey != null && !aisApiKey.isEmpty()) {
+                // Fetch from external API (VesselFinder, MarineTraffic, etc.) - Priority 1
+                log.debug("Fetching AIS data from {} API", aisProvider);
+                aisDataList = fetchFromExternalApi();
             } else if (openAisEnabled) {
-                // Fetch from Open-AIS (free Norwegian coastguard data)
+                // Fetch from Open-AIS (requires GitLab repository access - disabled by default) - Priority 2
                 log.debug("Fetching AIS data from Open-AIS");
                 aisDataList = openAisApiClient.fetchAisData();
-            } else if (aisApiUrl != null && !aisApiUrl.isEmpty()) {
-                // Fetch from external API (MarineTraffic, VesselFinder, etc.)
-                aisDataList = fetchFromExternalApi();
             } else {
-                log.warn("No AIS data source configured. Enable simulation, Open-AIS, or configure API URL.");
+                log.warn("No AIS data source configured. Configure VesselFinder API (url and key), enable simulation, or enable Open-AIS.");
                 return;
             }
             
@@ -173,8 +174,11 @@ public class AisDataIngestionService {
                 // MarineTraffic API format
                 return aisApiUrl + "?api_key=" + aisApiKey + "&timespan=10&protocol=jsono";
             case "VESSELFINDER":
-                // VesselFinder API format
-                return aisApiUrl + "?api_key=" + aisApiKey;
+                // VesselFinder API format for free account DEFAULT FLEET
+                // Free account includes 10 ships in DEFAULT FLEET
+                // API endpoint: https://www.vesselfinder.com/api
+                // Parameters: api_key (required), fleet (optional, defaults to DEFAULT)
+                return aisApiUrl + "?api_key=" + aisApiKey + "&fleet=DEFAULT";
             case "AISHUB":
                 // AISHub API format
                 return aisApiUrl + "?key=" + aisApiKey + "&format=json";
