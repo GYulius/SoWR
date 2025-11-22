@@ -74,13 +74,25 @@ public class Port {
     private String language;
     
     @Column(name = "tourism1")
-    private String tourism1;
+    private String tourism1; // Tourist Attractions (ATTRACTION category)
     
     @Column(name = "foodie_main", columnDefinition = "JSON")
-    private String foodieMain;
+    private String foodieMain; // Meal Venues - Main dishes (MEAL_VENUE category)
     
     @Column(name = "foodie_dessert", columnDefinition = "JSON")
-    private String foodieDessert;
+    private String foodieDessert; // Meal Venues - Desserts (MEAL_VENUE category)
+    
+    @Column(name = "activities", columnDefinition = "JSON")
+    private String activityKeywords; // Activities keywords (ACTIVITY category) - e.g., Swimming, Hiking, Snorkeling
+    
+    @Column(name = "restaurants", columnDefinition = "JSON")
+    private String restaurantKeywords; // Restaurant types/cuisines (RESTAURANT category) - e.g., Italian, Asian, Mediterranean
+    
+    @Column(name = "excursions", columnDefinition = "JSON")
+    private String excursions; // Shore Excursion keywords (EXCURSION category) - e.g., Adventure tours, Cultural tours
+    
+    @Column(name = "general_interests", columnDefinition = "JSON")
+    private String generalInterests; // General Interests keywords (GENERAL category) - e.g., History, Art, Nature
     
     @CreatedDate
     @Column(name = "created_at")
@@ -111,3 +123,4 @@ public class Port {
     @OneToMany(mappedBy = "port", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Recommendation> recommendations;
 }
+

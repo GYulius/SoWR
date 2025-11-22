@@ -1,6 +1,8 @@
 package com.cruise.recommender.controller;
 
+import com.cruise.recommender.entity.CruiseShip;
 import com.cruise.recommender.entity.Port;
+import com.cruise.recommender.repository.CruiseShipRepository;
 import com.cruise.recommender.repository.PortRepository;
 import com.cruise.recommender.service.PortDataService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class WebController {
     
     private final PortRepository portRepository;
     private final PortDataService portDataService;
+    private final CruiseShipRepository cruiseShipRepository;
     
     @GetMapping("/login")
     public String login() {
@@ -133,5 +136,34 @@ public class WebController {
     @GetMapping("/docs")
     public String docs() {
         return "redirect:/swagger-ui.html";
+    }
+    
+    /**
+     * API endpoint to get all cruise ships for dropdown (from database)
+     * Accessible at /api/v1/ships (context path + mapping)
+     * Public endpoint - no authentication required
+     */
+    @GetMapping("/ships")
+    @ResponseBody
+    @CrossOrigin(origins = "*")
+    public List<CruiseShip> getAllShips() {
+        log.info("=== GET /ships endpoint called ===");
+        log.info("Fetching all cruise ships from database");
+        try {
+            List<CruiseShip> ships = cruiseShipRepository.findAll();
+            log.info("Found {} ships in database", ships.size());
+            if (!ships.isEmpty()) {
+                log.info("First ship sample: id={}, name={}, cruiseLine={}, mmsi={}", 
+                        ships.get(0).getId(), ships.get(0).getName(), 
+                        ships.get(0).getCruiseLine(), ships.get(0).getMmsi());
+            } else {
+                log.warn("No ships found in database! Check if data was inserted.");
+            }
+            log.info("=== Returning {} ships ===", ships.size());
+            return ships;
+        } catch (Exception e) {
+            log.error("Error fetching ships from database", e);
+            throw e;
+        }
     }
 }

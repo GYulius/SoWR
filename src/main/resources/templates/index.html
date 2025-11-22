@@ -10,39 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
          crossorigin=""/>
-    <style>
-        .hero-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px 0;
-        }
-        .feature-card {
-            transition: transform 0.3s ease;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-        .port-card {
-            border: none;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-        }
-        .stats-section {
-            background-color: #f8f9fa;
-            padding: 60px 0;
-        }
-        #map {
-            height: 500px;
-            width: 100%;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .port-selector {
-            margin-bottom: 20px;
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/static/css/styles.css}" href="/static/css/styles.css">
 </head>
 <body>
     <!-- Navigation -->
@@ -66,9 +34,7 @@
                         <a class="nav-link" href="#ports" th:text="#{nav.ports}">Ports</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#fleet-tracker">
-                            <i class="fas fa-ship me-1"></i>Fleet Tracker
-                        </a>
+                        <a class="nav-link" href="#fleet-tracker">Fleet Tracker</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#foodie" th:text="#{nav.foodie}">Foodie</a>
@@ -152,7 +118,7 @@
                             <form id="interestsForm">
                                 <!-- Cruise Ship -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="cruiseShipInterests" class="form-label fw-bold">
                                         <i class="fas fa-ship me-2"></i>Cruise Ship Preferences
                                     </label>
                                     <input type="text" class="form-control" id="cruiseShipInterests" 
@@ -162,7 +128,7 @@
                                 
                                 <!-- Port of Call -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="portInterests" class="form-label fw-bold">
                                         <i class="fas fa-anchor me-2"></i>Port of Call Preferences
                                     </label>
                                     <input type="text" class="form-control" id="portInterests" 
@@ -172,7 +138,7 @@
                                 
                                 <!-- Activities -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="activityInterests" class="form-label fw-bold">
                                         <i class="fas fa-running me-2"></i>Activities
                                     </label>
                                     <input type="text" class="form-control" id="activityInterests" 
@@ -182,7 +148,7 @@
                                 
                                 <!-- Tourist Attractions -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="attractionInterests" class="form-label fw-bold">
                                         <i class="fas fa-camera me-2"></i>Tourist Attractions
                                     </label>
                                     <input type="text" class="form-control" id="attractionInterests" 
@@ -192,7 +158,7 @@
                                 
                                 <!-- Meal Venues -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="mealVenueInterests" class="form-label fw-bold">
                                         <i class="fas fa-utensils me-2"></i>Meal Venues
                                     </label>
                                     <input type="text" class="form-control" id="mealVenueInterests" 
@@ -202,7 +168,7 @@
                                 
                                 <!-- Restaurants -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="restaurantInterests" class="form-label fw-bold">
                                         <i class="fas fa-store me-2"></i>Restaurants
                                     </label>
                                     <input type="text" class="form-control" id="restaurantInterests" 
@@ -212,7 +178,7 @@
                                 
                                 <!-- Shore Excursions -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="excursionInterests" class="form-label fw-bold">
                                         <i class="fas fa-umbrella-beach me-2"></i>Shore Excursions
                                     </label>
                                     <input type="text" class="form-control" id="excursionInterests" 
@@ -222,7 +188,7 @@
                                 
                                 <!-- General Interests -->
                                 <div class="mb-4">
-                                    <label class="form-label fw-bold">
+                                    <label for="generalInterests" class="form-label fw-bold">
                                         <i class="fas fa-star me-2"></i>General Interests
                                     </label>
                                     <input type="text" class="form-control" id="generalInterests" 
@@ -384,15 +350,17 @@
                                     <label for="portSelect" class="form-label fw-bold">
                                         <i class="fas fa-map-marker-alt me-2"></i><span th:text="#{ports.selectPort}">Select a Port:</span>
                                     </label>
+                                    <label for="portSearch" class="visually-hidden">Search ports</label>
                                     <input type="text" id="portSearch" class="form-control mb-2" 
                                            th:placeholder="#{ports.searchPorts}" 
                                            placeholder="Search ports..." 
+                                           aria-label="Search ports"
                                            onkeyup="filterPorts()">
                                     <select id="portSelect" class="form-select form-select-lg" size="10" style="max-height: 300px;">
                                         <option value="" th:text="#{ports.selectPortPlaceholder}">-- Select a Port --</option>
                                         <!-- Ports will be loaded dynamically from database -->
                                     </select>
-                                    <small class="text-muted" id="portCount" th:text="#{ports.totalPorts(0)}">Total ports: 0</small>
+                                    <small class="text-muted" id="portCount">Total ports: 0</small>
                                 </div>
                                 <div class="col-md-8">
                                     <div id="portInfo" class="text-muted" style="display: none;">
@@ -428,23 +396,57 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-12">
+                <div class="col-md-8">
                     <div class="card">
                         <div class="card-body">
                             <script type="text/javascript">
-                                // Map appearance
-                                var width="50%";         // width in pixels or percentage
-                                var height="300";         // height in pixels
-                                var latitude="36.00";     // center latitude (decimal degrees)
-                                var longitude="-5.40";    // center longitude (decimal degrees)
-                                var names=true;           // always show ship names (defaults to false)
+                                // Map appearance - Required by vesselfinder.com AIS map script
+                                // These variables are used by the external script, not our code
+                                /* eslint-disable no-unused-vars */
+                                const width="100%";         // width in pixels or percentage
+                                const height="500";         // height in pixels
+                                const latitude="36.00";     // center latitude (decimal degrees)
+                                const longitude="-5.40";    // center longitude (decimal degrees)
+                                const names=true;           // always show ship names (defaults to false)
 
-                                // Fleet tracking
-                                var fleet="32d95ba7142bf60d814fe72fa0a0ee9d";
-                                var fleet_name="Default Fleet";
-                                var fleet_timespan="1440"; // maximum age in minutes of the displayed ship positions
+                                // Fleet tracking - Required by vesselfinder.com AIS map script
+                                const fleet="32d95ba7142bf60d814fe72fa0a0ee9d";
+                                const fleet_name="Default Fleet";
+                                const fleet_timespan="1440"; // maximum age in minutes of the displayed ship positions
+                                /* eslint-enable no-unused-vars */
                             </script>
-                            <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+                            <div id="vesselfinderMapContainer">
+                                <script type="text/javascript" src="https://www.vesselfinder.com/aismap.js"></script>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-search me-2"></i>Find Ship on Map
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <label for="shipSelect" class="form-label fw-bold">
+                                Select a Cruise Ship:
+                            </label>
+                            <select id="shipSelect" class="form-select form-select-lg mb-3">
+                                <option value="">-- Select a Ship --</option>
+                                <!-- Ships will be loaded dynamically -->
+                            </select>
+                            <div id="shipInfo" class="alert alert-info" style="display: none;">
+                                <strong id="selectedShipName"></strong><br>
+                                <small id="selectedShipDetails"></small>
+                            </div>
+                            <button id="highlightShipBtn" class="btn btn-primary w-100" disabled onclick="highlightShipOnMap()">
+                                <i class="fas fa-map-marker-alt me-2"></i>Highlight on Map
+                            </button>
+                            <p class="text-muted small mt-3">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Select a ship from the dropdown and click "Highlight on Map" to find it on the vesselfinder map.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -717,7 +719,7 @@
                                 <i class="fab fa-facebook me-2"></i>Facebook
                             </button>
                             <button type="button" class="btn btn-outline-info" onclick="loginWithTwitter()">
-                                <i class="fab fa-twitter me-2"></i>Twitter
+                                <i class="fab fa-twitter me-2"></i>X
                             </button>
                             <button type="button" class="btn btn-outline-dark" onclick="loginWithTikTok()">
                                 <i class="fab fa-tiktok me-2"></i>TikTok
@@ -817,7 +819,22 @@
          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
          crossorigin=""></script>
     
+    <!-- Facebook SDK for JavaScript -->
     <script>
+        (function(d, s, id) {
+            var js, fjs = d.getElementsByTagName(s)[0];
+            if (d.getElementById(id)) {return;}
+            js = d.createElement(s); js.id = id;
+            js.src = "https://connect.facebook.net/en_US/sdk.js";
+            fjs.parentNode.insertBefore(js, fjs);
+        }(document, 'script', 'facebook-jssdk'));
+    </script>
+    
+    <script>
+        /**
+         * Leaflet map initialization
+         * @global {Object} L - Leaflet library loaded from CDN
+         */
         // Initialize map (will be centered when port is selected)
         let map = L.map('map').setView([41.3851, 2.1734], 6); // Default: Barcelona area
         
@@ -827,6 +844,7 @@
             maxZoom: 19
         }).addTo(map);
         
+        // Global variables for map markers
         let portMarker = null;
         let shipMarkers = [];
         let allPorts = []; // Store all ports from database
@@ -844,6 +862,25 @@
             // If accessing through IntelliJ web server or other, use full Spring Boot URL
             return 'http://localhost:8080/api/v1';
         }
+        
+        // Facebook SDK initialization
+        let facebookAppId = null;
+        window.fbAsyncInit = function() {
+            // Initialize the SDK with your app and the Graph API version for your app
+            getFacebookAppId().then(appId => {
+                if (appId) {
+                    facebookAppId = appId;
+                    FB.init({
+                        appId: appId,
+                        xfbml: true,
+                        version: 'v24.0'
+                    });
+                    console.log('Facebook SDK initialized');
+                } else {
+                    console.warn('Facebook App ID not configured');
+                }
+            });
+        };
         
         // Load ports from database API
         function loadPortsFromDatabase() {
@@ -993,7 +1030,7 @@
             document.getElementById('portInfo').style.display = 'block';
             
             // Update port card
-            const port = allPorts.find(p => p.id == portId);
+            const port = allPorts.find(p => p.id === Number(portId));
             if (port) {
                 document.getElementById('portCardsContainer').innerHTML = `
                     <div class="col-md-6 col-lg-4">
@@ -1019,8 +1056,9 @@
                 `;
             }
             
-            // Center map on port
-            map.setView([lat, lng], 12);
+            // Center map on port with proper zoom
+            map.setView([lat, lng], 13);
+            map.invalidateSize(); // Ensure map resizes properly
             
             // Clear existing markers
             clearMarkers();
@@ -1030,6 +1068,12 @@
                 .addTo(map)
                 .bindPopup(`<b>${portName}</b><br>Port Code: ${selectedOption.text.split('(')[1]?.split(')')[0] || 'N/A'}${country ? '<br>Country: ' + country : ''}`)
                 .openPopup();
+            
+            // Ensure map view is updated after a brief delay
+            setTimeout(() => {
+                map.invalidateSize();
+                map.setView([lat, lng], 13);
+            }, 100);
             
             // Fetch ships near this port
             loadShipsNearPort(lat, lng);
@@ -1062,6 +1106,7 @@
                     document.getElementById('foodieContent').style.display = 'block';
                     
                     // Parse and display foodie_main
+                    // port.foodieMain and port.foodieDessert come from API response
                     if (port.foodieMain) {
                         try {
                             const foodieMain = typeof port.foodieMain === 'string' 
@@ -1104,6 +1149,10 @@
                 });
         });
         
+        /**
+         * Clear all markers from the map
+         * map.removeLayer is a Leaflet method
+         */
         function clearMarkers() {
             if (portMarker) {
                 map.removeLayer(portMarker);
@@ -1190,6 +1239,7 @@
         // Initialize: Load ports from database when page loads
         window.addEventListener('DOMContentLoaded', function() {
             loadPortsFromDatabase();
+            loadShipsForDropdown();
             checkLoginStatus();
         });
         
@@ -1695,11 +1745,124 @@
             document.getElementById('myPersonalInterests').style.display = 'none';
         }
         
-        // Social Login Functions (Placeholder - requires OAuth implementation)
-        function loginWithFacebook() {
-            alert('Facebook login will be implemented. For now, please use email/password login.');
-            // TODO: Implement Facebook OAuth
-            // window.location.href = '/auth/facebook';
+        // Social Login Functions
+        async function loginWithFacebook() {
+            try {
+                // Check if Facebook SDK is loaded
+                if (typeof FB === 'undefined') {
+                    alert('Facebook SDK is still loading. Please wait a moment and try again.');
+                    return;
+                }
+                
+                // Ensure Facebook SDK is initialized
+                if (!facebookAppId) {
+                    const appId = await getFacebookAppId().catch(() => null);
+                    if (!appId) {
+                        alert('Facebook login is not configured. Please contact the administrator.');
+                        return;
+                    }
+                    facebookAppId = appId;
+                    FB.init({
+                        appId: appId,
+                        xfbml: true,
+                        version: 'v24.0'
+                    });
+                }
+                
+                // Use Facebook SDK login dialog
+                FB.login(function(response) {
+                    if (response.authResponse) {
+                        console.log('Welcome! Fetching your information....');
+                        
+                        // Get user information from Facebook
+                        FB.api('/me', {fields: 'name,email'}, async function(userInfo) {
+                            try {
+                                const basePath = getBasePath();
+                                
+                                // Send Facebook access token and user info to backend for authentication
+                                const loginResponse = await fetch(`${basePath}/auth/facebook/login`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    credentials: 'include',
+                                    body: JSON.stringify({
+                                        accessToken: response.authResponse.accessToken,
+                                        userId: userInfo.id,
+                                        name: userInfo.name,
+                                        email: userInfo.email
+                                    })
+                                });
+                                
+                                if (loginResponse.ok) {
+                                    const authData = await loginResponse.json();
+                                    
+                                    // Store authentication data
+                                    if (authData.token) {
+                                        localStorage.setItem('token', authData.token);
+                                    }
+                                    if (authData.userId) {
+                                        localStorage.setItem('user', JSON.stringify({
+                                            userId: authData.userId,
+                                            email: authData.email,
+                                            firstName: authData.firstName,
+                                            lastName: authData.lastName,
+                                            role: authData.role
+                                        }));
+                                    }
+                                    
+                                    // Update UI
+                                    document.getElementById('loginNavItem').style.display = 'none';
+                                    document.getElementById('userNavItem').style.display = 'block';
+                                    document.getElementById('myInterestsNavItem').style.display = 'block';
+                                    
+                                    // Close login modal if open
+                                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                                    if (loginModal) {
+                                        loginModal.hide();
+                                    }
+                                    
+                                    // Reload page to show user-specific content
+                                    window.location.reload();
+                                } else {
+                                    const error = await loginResponse.text();
+                                    alert('Facebook login failed: ' + error);
+                                }
+                            } catch (error) {
+                                console.error('Error processing Facebook login:', error);
+                                alert('Failed to complete Facebook login. Please try again.');
+                            }
+                        });
+                    } else {
+                        // User cancelled login or did not fully authorize
+                        console.log('User cancelled login or did not fully authorize.');
+                    }
+                }, {scope: 'email,public_profile'});
+            } catch (error) {
+                console.error('Facebook login error:', error);
+                alert('Failed to initiate Facebook login. Please try again.');
+            }
+        }
+        
+        // Helper function to get Facebook App ID from backend
+        async function getFacebookAppId() {
+            const basePath = getBasePath();
+            try {
+                const response = await fetch(`${basePath}/auth/facebook/config`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const config = await response.json();
+                    return config.appId;
+                }
+            } catch (error) {
+                console.warn('Could not fetch Facebook config from backend:', error);
+            }
+            
+            // Fallback: return null to indicate configuration is needed
+            return null;
         }
         
         function loginWithTwitter() {
@@ -1858,7 +2021,16 @@
                     console.log('Passenger response status:', passengerResponse.status);
                     
                     if (passengerResponse.ok) {
-                        const passengers = await passengerResponse.json();
+                        let passengers;
+                        try {
+                            const responseText = await passengerResponse.text();
+                            console.log('Passenger response text length:', responseText.length);
+                            passengers = JSON.parse(responseText);
+                        } catch (jsonError) {
+                            console.error('JSON parsing error:', jsonError);
+                            alert('Error: Invalid response from server when fetching passenger profile. Please try again.');
+                            return;
+                        }
                         console.log('Passengers received:', passengers);
                         if (passengers && Array.isArray(passengers) && passengers.length > 0) {
                             passengerId = passengers[0].id;
@@ -1871,7 +2043,15 @@
                                 credentials: 'include'
                             });
                             if (retryResponse.ok) {
-                                const retryPassengers = await retryResponse.json();
+                                let retryPassengers;
+                                try {
+                                    const retryText = await retryResponse.text();
+                                    retryPassengers = JSON.parse(retryText);
+                                } catch (jsonError) {
+                                    console.error('JSON parsing error on retry:', jsonError);
+                                    alert('Error: Invalid response from server when creating passenger profile. Please try again.');
+                                    return;
+                                }
                                 if (retryPassengers && Array.isArray(retryPassengers) && retryPassengers.length > 0) {
                                     passengerId = retryPassengers[0].id;
                                     console.log('Passenger created with ID:', passengerId);
@@ -1951,6 +2131,142 @@
                 console.error('Error saving interests:', error);
                 alert('Error saving interests: ' + error.message);
             }
+        }
+        
+        // Load ships for dropdown
+        async function loadShipsForDropdown() {
+            try {
+                const basePath = getBasePath();
+                // Use public endpoint instead of admin endpoint
+                const response = await fetch(`${basePath}/ships`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const ships = await response.json(); // This endpoint returns List directly
+                    const shipSelect = document.getElementById('shipSelect');
+                    
+                    if (!shipSelect) {
+                        console.log('Ship select dropdown not found, skipping ship loading');
+                        return;
+                    }
+                    
+                    // Clear existing options except the first one
+                    shipSelect.innerHTML = '<option value="">-- Select a Ship --</option>';
+                    
+                    ships.forEach(ship => {
+                        if (ship.name) {
+                            const option = document.createElement('option');
+                            option.value = ship.id;
+                            option.textContent = `${ship.name}${ship.cruiseLine ? ' - ' + ship.cruiseLine : ''}`;
+                            option.dataset.shipName = ship.name;
+                            option.dataset.mmsi = ship.mmsi || '';
+                            option.dataset.lat = ship.currentLatitude || '';
+                            option.dataset.lng = ship.currentLongitude || '';
+                            shipSelect.appendChild(option);
+                        }
+                    });
+                    
+                    // Enable ship selection
+                    shipSelect.addEventListener('change', function() {
+                        const selectedOption = this.options[this.selectedIndex];
+                        const shipInfo = document.getElementById('shipInfo');
+                        const highlightBtn = document.getElementById('highlightShipBtn');
+                        
+                        if (this.value && shipInfo && highlightBtn) {
+                            document.getElementById('selectedShipName').textContent = selectedOption.dataset.shipName;
+                            const details = [];
+                            if (selectedOption.dataset.mmsi) details.push(`MMSI: ${selectedOption.dataset.mmsi}`);
+                            if (selectedOption.dataset.lat && selectedOption.dataset.lng) {
+                                details.push(`Position: ${parseFloat(selectedOption.dataset.lat).toFixed(4)}, ${parseFloat(selectedOption.dataset.lng).toFixed(4)}`);
+                            }
+                            document.getElementById('selectedShipDetails').textContent = details.join(' | ') || 'No position data available';
+                            shipInfo.style.display = 'block';
+                            highlightBtn.disabled = false;
+                        } else if (shipInfo && highlightBtn) {
+                            shipInfo.style.display = 'none';
+                            highlightBtn.disabled = true;
+                        }
+                    });
+                } else {
+                    console.error('Failed to load ships:', response.status);
+                    const shipSelect = document.getElementById('shipSelect');
+                    if (shipSelect) {
+                        shipSelect.innerHTML = '<option value="">Error loading ships (may require login)</option>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading ships:', error);
+                const shipSelect = document.getElementById('shipSelect');
+                if (shipSelect) {
+                    shipSelect.innerHTML = '<option value="">Error loading ships</option>';
+                }
+            }
+        }
+        
+        // Highlight ship on vesselfinder map
+        function highlightShipOnMap() {
+            const shipSelect = document.getElementById('shipSelect');
+            if (!shipSelect) return;
+            
+            const selectedOption = shipSelect.options[shipSelect.selectedIndex];
+            
+            if (!selectedOption.value) {
+                alert('Please select a ship first');
+                return;
+            }
+            
+            const shipName = selectedOption.dataset.shipName;
+            const lat = selectedOption.dataset.lat;
+            const lng = selectedOption.dataset.lng;
+            const mmsi = selectedOption.dataset.mmsi;
+            
+            // Try to find the ship on the vesselfinder map by parsing DOM
+            const mapContainer = document.getElementById('vesselfinderMapContainer');
+            if (!mapContainer) {
+                alert('Map container not found');
+                return;
+            }
+            
+            // Wait a bit for the map to fully load
+            setTimeout(() => {
+                // Look for ship markers/labels in the map
+                const allElements = mapContainer.querySelectorAll('*');
+                let found = false;
+                
+                // Search for elements containing the ship name
+                allElements.forEach(element => {
+                    const text = element.textContent || element.innerText || '';
+                    if (text.includes(shipName) || (mmsi && text.includes(mmsi))) {
+                        // Found a potential match
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        element.style.border = '3px solid red';
+                        element.style.boxShadow = '0 0 10px red';
+                        setTimeout(() => {
+                            element.style.border = '';
+                            element.style.boxShadow = '';
+                        }, 5000);
+                        found = true;
+                    }
+                });
+                
+                // If we have coordinates, display them
+                if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                    const iframe = mapContainer.querySelector('iframe');
+                    if (iframe) {
+                        console.log('Ship coordinates:', lat, lng);
+                        alert(`Ship "${shipName}" coordinates: ${lat}, ${lng}\n\nIf the ship is visible on the map, it should be highlighted. Otherwise, use the coordinates to manually locate it on the map.`);
+                    } else {
+                        alert(`Ship "${shipName}" coordinates: ${lat}, ${lng}\n\nUse these coordinates to locate the ship on the map.`);
+                    }
+                } else {
+                    if (!found) {
+                        alert(`Ship "${shipName}" found in dropdown but no position data available.\n\nTry hovering over ship markers on the map to find "${shipName}".`);
+                    } else {
+                        alert(`Ship "${shipName}" should be highlighted on the map.`);
+                    }
+                }
+            }, 2000); // Wait 2 seconds for map to load
         }
     </script>
 </body>

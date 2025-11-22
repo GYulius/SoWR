@@ -20,8 +20,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Authentication Controller
@@ -37,6 +41,14 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    
+    @Value("${social.media.facebook.app.id:}")
+    private String facebookAppId;
+    
+    @Value("${social.media.facebook.app.secret:}")
+    private String facebookAppSecret;
+    
+    private final RestTemplate restTemplate;
     
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest, HttpServletResponse httpResponse) {
@@ -196,6 +208,115 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
     
+    @GetMapping("/facebook/config")
+    public ResponseEntity<?> getFacebookConfig() {
+        Map<String, String> config = new HashMap<>();
+        if (facebookAppId != null && !facebookAppId.isEmpty()) {
+            config.put("appId", facebookAppId);
+            return ResponseEntity.ok(config);
+        } else {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Facebook login is not configured");
+        }
+    }
+    
+    @PostMapping("/facebook/login")
+    public ResponseEntity<?> loginWithFacebook(@RequestBody FacebookLoginRequest request, HttpServletResponse httpResponse) {
+        try {
+            // Verify the access token with Facebook
+            String verifyUrl = String.format(
+                "https://graph.facebook.com/v24.0/me?access_token=%s&fields=id,name,email",
+                request.getAccessToken()
+            );
+            
+            Map<String, Object> facebookUser;
+            try {
+                facebookUser = restTemplate.getForObject(verifyUrl, Map.class);
+            } catch (Exception e) {
+                log.error("Failed to verify Facebook access token: {}", e.getMessage());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Invalid Facebook access token");
+            }
+            
+            if (facebookUser == null || !facebookUser.containsKey("id")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Failed to verify Facebook user");
+            }
+            
+            String facebookUserId = (String) facebookUser.get("id");
+            String email = (String) facebookUser.get("email");
+            String name = (String) facebookUser.get("name");
+            
+            // Extract first and last name from full name
+            String firstName = "";
+            String lastName = "";
+            if (name != null && !name.isEmpty()) {
+                String[] nameParts = name.split(" ", 2);
+                firstName = nameParts[0];
+                lastName = nameParts.length > 1 ? nameParts[1] : "";
+            }
+            
+            // Find or create user
+            User user = userRepository.findByEmail(email).orElse(null);
+            
+            if (user == null) {
+                // Create new user from Facebook
+                user = User.builder()
+                        .email(email != null ? email : facebookUserId + "@facebook.com")
+                        .passwordHash("") // No password for social login
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .role(Role.USER)
+                        .isActive(true)
+                        .build();
+                user = userRepository.save(user);
+                log.info("Created new user from Facebook login: {}", email);
+            } else {
+                // Update last login for existing user
+                user.setLastLogin(LocalDateTime.now());
+                userRepository.save(user);
+            }
+            
+            // Generate JWT token
+            String token = tokenProvider.generateToken(
+                    user.getEmail(),
+                    user.getId(),
+                    user.getRole().name()
+            );
+            
+            // Set token as HTTP-only cookie
+            Cookie cookie = new Cookie("token", token);
+            cookie.setHttpOnly(false);
+            cookie.setPath("/api/v1");
+            cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+            cookie.setAttribute("SameSite", "Lax");
+            httpResponse.addCookie(cookie);
+            
+            // Also set cookie for root path
+            Cookie rootCookie = new Cookie("token", token);
+            rootCookie.setHttpOnly(false);
+            rootCookie.setPath("/");
+            rootCookie.setMaxAge(7 * 24 * 60 * 60);
+            rootCookie.setAttribute("SameSite", "Lax");
+            httpResponse.addCookie(rootCookie);
+            
+            AuthResponse response = AuthResponse.builder()
+                    .token(token)
+                    .email(user.getEmail())
+                    .userId(user.getId())
+                    .role(user.getRole().name())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .build();
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Facebook login error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to process Facebook login");
+        }
+    }
+    
     // Inner class for registration request
     @lombok.Data
     public static class RegisterRequest {
@@ -204,6 +325,15 @@ public class AuthController {
         private String firstName;
         private String lastName;
         private String role; // Optional: "USER" or "ADMIN"
+    }
+    
+    // Inner class for Facebook login request
+    @lombok.Data
+    public static class FacebookLoginRequest {
+        private String accessToken;
+        private String userId;
+        private String name;
+        private String email;
     }
 }
 

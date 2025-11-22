@@ -94,10 +94,11 @@
         </dependency>
         
         <!-- Apache Jena for RDF/SPARQL -->
+        <!-- Updated to 5.6.0 to match Fuseki Docker container version -->
         <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>apache-jena-libs</artifactId>
-            <version>4.9.0</version>
+            <version>5.6.0</version>
             <type>pom</type>
         </dependency>
         
@@ -243,19 +244,32 @@
             <version>5.2.1</version>
         </dependency>
         
+        <!-- HTTP Core 5 for HttpClient 5 (required for AuthScope) -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>5.2.1</version>
+        </dependency>
+        
         <!-- Apache Jena SPARQL for querying RDF -->
+        <!-- Updated to 5.6.0 to match Fuseki Docker container version -->
         <dependency>
             <groupId>org.apache.jena</groupId>
             <artifactId>jena-arq</artifactId>
-            <version>4.9.0</version>
+            <version>5.6.0</version>
         </dependency>
         
-        <!-- Apache Jena TDB for RDF storage -->
+        <!-- Apache Jena TDB2 for RDF storage -->
+        <!-- Updated to 5.6.0 - TDB2 is the current storage backend -->
         <dependency>
             <groupId>org.apache.jena</groupId>
-            <artifactId>jena-tdb</artifactId>
-            <version>4.9.0</version>
+            <artifactId>jena-tdb2</artifactId>
+            <version>5.6.0</version>
         </dependency>
+        
+        <!-- Apache Jena Fuseki Client for connecting to Fuseki server -->
+        <!-- Note: jena-fuseki-client may not be available in 5.6.0, using jena-arq instead -->
+        <!-- The SPARQL HTTP execution is handled by jena-arq -->
         
         <!-- Testing -->
         <dependency>

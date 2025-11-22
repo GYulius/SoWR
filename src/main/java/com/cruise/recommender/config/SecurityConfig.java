@@ -73,6 +73,8 @@ public class SecurityConfig {
                     "/recommendations/**",
                     "/publishers/**",
                     "/admin/**",
+                    "/api/rdf/**",
+                    "/rdf/**",
                     "/error",
                     "/error/**"
                 )
@@ -98,7 +100,11 @@ public class SecurityConfig {
                 
                 // Public API endpoints (for frontend)
                 .requestMatchers("/ports/**").permitAll()
+                .requestMatchers("/ships").permitAll() // Public ships endpoint for dropdown
                 .requestMatchers("/dashboard/**").permitAll()
+                
+                // RDF endpoints - public (for knowledge graph operations)
+                .requestMatchers("/api/rdf/**", "/rdf/**").permitAll()
                 
                 // Passenger endpoints - require authentication (users can access their own passenger data)
                 .requestMatchers("/passengers/**").authenticated()

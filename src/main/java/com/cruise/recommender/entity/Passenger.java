@@ -1,5 +1,6 @@
 package com.cruise.recommender.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -32,10 +33,12 @@ public class Passenger {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
     
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cruise_schedule_id", nullable = false)
     private CruiseSchedule cruiseSchedule;
@@ -91,13 +94,16 @@ public class Passenger {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    // Relationships
+    // Relationships - Ignored in JSON serialization to avoid lazy loading issues
+    @JsonIgnore
     @OneToMany(mappedBy = "passenger", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SocialMediaProfile> socialMediaProfiles;
     
+    @JsonIgnore
     @OneToMany(mappedBy = "passenger", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PassengerInterest> interests;
     
+    @JsonIgnore
     @OneToMany(mappedBy = "passenger", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ShoreExcursionBooking> shoreExcursionBookings;
 }
