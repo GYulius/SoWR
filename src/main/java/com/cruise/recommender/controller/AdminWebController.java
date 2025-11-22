@@ -23,6 +23,11 @@ public class AdminWebController {
         return "admin/maintenance";
     }
     
+    @GetMapping("/admin/stats")
+    public String stats() {
+        return "admin/stats";
+    }
+    
     // Removed individual entity page mappings to avoid conflicts with AdminController API endpoints
     // All CRUD operations are handled through the maintenance page tabs and AdminController REST APIs
 }
