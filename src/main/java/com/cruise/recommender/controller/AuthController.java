@@ -48,6 +48,15 @@ public class AuthController {
     @Value("${social.media.facebook.app.secret:}")
     private String facebookAppSecret;
     
+    @Value("${knowledge.graph.endpoint:http://localhost:3030/cruise_kg/sparql}")
+    private String knowledgeGraphEndpoint;
+    
+    @Value("${knowledge.graph.fuseki.base-url:http://localhost:3030}")
+    private String fusekiBaseUrl;
+    
+    @Value("${server.servlet.context-path:/api/v1}")
+    private String contextPath;
+    
     private final RestTemplate restTemplate;
     
     @PostMapping("/login")
@@ -218,6 +227,51 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body("Facebook login is not configured");
         }
+    }
+    
+    /**
+     * Get frontend configuration
+     * This endpoint provides configuration values needed by the frontend (index.html)
+     * including Facebook App ID, API endpoints, and other client-side settings.
+     * Sensitive values like secrets are NOT exposed - only public configuration.
+     * GET /api/v1/config/frontend
+     */
+    @GetMapping("/config/frontend")
+    public ResponseEntity<Map<String, Object>> getFrontendConfig() {
+        Map<String, Object> config = new HashMap<>();
+        
+        // Facebook configuration (only public App ID, not secret)
+        Map<String, Object> facebookConfig = new HashMap<>();
+        facebookConfig.put("appId", facebookAppId != null && !facebookAppId.isEmpty() ? facebookAppId : "");
+        facebookConfig.put("version", "v24.0");
+        config.put("facebook", facebookConfig);
+        
+        // API configuration
+        Map<String, Object> apiConfig = new HashMap<>();
+        apiConfig.put("basePath", contextPath);
+        Map<String, Object> endpoints = new HashMap<>();
+        endpoints.put("auth", contextPath + "/auth");
+        Map<String, String> facebookEndpoints = new HashMap<>();
+        facebookEndpoints.put("config", contextPath + "/auth/facebook/config");
+        facebookEndpoints.put("login", contextPath + "/auth/facebook/login");
+        endpoints.put("facebook", facebookEndpoints);
+        apiConfig.put("endpoints", endpoints);
+        config.put("api", apiConfig);
+        
+        // Knowledge Graph configuration (public endpoints only)
+        Map<String, Object> kgConfig = new HashMap<>();
+        kgConfig.put("endpoint", knowledgeGraphEndpoint);
+        kgConfig.put("baseUrl", fusekiBaseUrl);
+        config.put("knowledgeGraph", kgConfig);
+        
+        // Feature flags
+        Map<String, Boolean> features = new HashMap<>();
+        features.put("facebookLogin", facebookAppId != null && !facebookAppId.isEmpty());
+        features.put("twitterLogin", false);
+        features.put("instagramLogin", false);
+        config.put("features", features);
+        
+        return ResponseEntity.ok(config);
     }
     
     @PostMapping("/facebook/login")

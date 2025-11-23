@@ -76,9 +76,6 @@
 <body>
     <div class="sidebar">
         <h4 class="mb-4 px-3"><i class="fas fa-ship me-2"></i>Admin Panel</h4>
-        <a th:href="@{/admin/dashboard}" href="/api/v1/admin/dashboard">
-            <i class="fas fa-chart-line me-2"></i>Dashboard
-        </a>
         <a th:href="@{/admin/maintenance}" href="/api/v1/admin/maintenance">
             <i class="fas fa-tools me-2"></i>Maintenance
         </a>
@@ -86,7 +83,7 @@
             <i class="fas fa-chart-bar me-2"></i>Statistics
         </a>
         <hr class="text-white">
-        <a th:href="@{/}" href="/api/v1/" target="_blank">
+        <a href="#" onclick="window.location.href='/api/v1/'; return false;" style="cursor: pointer;">
             <i class="fas fa-home me-2"></i>Public Site
         </a>
         <a href="#" onclick="logout()">

@@ -21,7 +21,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.StringWriter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service for creating and managing RDF datasets for ports using Apache Jena
@@ -47,10 +49,12 @@ public class PortRdfService {
     @Value("${knowledge.graph.namespace:http://cruise.recommender.org/kg/}")
     private String namespace;
     
-    @Value("${knowledge.graph.username:admin}")
+    // Fuseki credentials - must be set via environment variables in production
+    // Use FUSEKI_ADMIN_USER and FUSEKI_ADMIN_PASSWORD environment variables
+    @Value("${knowledge.graph.username:}")
     private String fusekiUsername;
     
-    @Value("${knowledge.graph.password:admin}")
+    @Value("${knowledge.graph.password:}")
     private String fusekiPassword;
     
     // SKOS namespace
@@ -467,9 +471,18 @@ public class PortRdfService {
      * Format: http://username:password@host:port/path
      */
     private String buildAuthenticatedEndpointUrl(String endpoint) {
+        // Use configured credentials or defaults for development
+        String username = (fusekiUsername == null || fusekiUsername.trim().isEmpty()) ? "admin" : fusekiUsername;
+        String password = (fusekiPassword == null || fusekiPassword.trim().isEmpty()) ? "admin" : fusekiPassword;
+        
+        if ((fusekiUsername == null || fusekiUsername.trim().isEmpty()) || 
+            (fusekiPassword == null || fusekiPassword.trim().isEmpty())) {
+            log.warn("Fuseki credentials not configured in buildAuthenticatedEndpointUrl, using default admin:admin for development.");
+        }
+        
         try {
             java.net.URL url = new java.net.URL(endpoint);
-            String userInfo = fusekiUsername + ":" + fusekiPassword;
+            String userInfo = username + ":" + password;
             int port = url.getPort() == -1 ? url.getDefaultPort() : url.getPort();
             
             // Build URL with embedded credentials
@@ -616,17 +629,30 @@ public class PortRdfService {
      * Note: This may not work with all HTTP libraries, so we also try without auth as fallback
      */
     private HttpClient createAuthenticatedHttpClient() {
+        // Use configured credentials or defaults for development
+        String username = (fusekiUsername == null || fusekiUsername.trim().isEmpty()) ? "admin" : fusekiUsername;
+        String password = (fusekiPassword == null || fusekiPassword.trim().isEmpty()) ? "admin" : fusekiPassword;
+        
+        if ((fusekiUsername == null || fusekiUsername.trim().isEmpty()) || 
+            (fusekiPassword == null || fusekiPassword.trim().isEmpty())) {
+            log.warn("Fuseki credentials not configured, using default admin:admin for development. Set FUSEKI_ADMIN_USER and FUSEKI_ADMIN_PASSWORD environment variables for production.");
+        } else {
+            log.debug("Using configured Fuseki credentials - Username: {}", username);
+        }
+        
         // Create an authenticator for Basic Auth
         // The Authenticator will be called when the server requests authentication
+        final String finalUsername = username;
+        final String finalPassword = password;
         java.net.Authenticator authenticator = new java.net.Authenticator() {
             @Override
             protected java.net.PasswordAuthentication getPasswordAuthentication() {
                 // Only provide credentials for Fuseki host
                 String requestingHost = getRequestingHost();
-                if (requestingHost != null && requestingHost.contains("localhost")) {
+                if (requestingHost != null && (requestingHost.contains("localhost") || requestingHost.contains("127.0.0.1"))) {
                     return new java.net.PasswordAuthentication(
-                        fusekiUsername, 
-                        fusekiPassword.toCharArray()
+                        finalUsername, 
+                        finalPassword.toCharArray()
                     );
                 }
                 return null;
@@ -751,6 +777,120 @@ public class PortRdfService {
         
         List<QuerySolution> results = queryPorts(query);
         return results.isEmpty() ? null : results.get(0);
+    }
+    
+    /**
+     * Find port features/concepts matching passenger interests using SPARQL
+     * This queries the RDF knowledge graph for ports that match multiple interest categories
+     * @return A map containing "query" (the SPARQL query string) and "results" (the query solutions)
+     */
+    public Map<String, Object> findPortFeaturesByInterestsWithQuery(String portCode, List<String> interestKeywords, List<String> interestCategories) {
+        log.info("Finding port features by interests for portCode: {}, keywords: {}, categories: {}", 
+                portCode, interestKeywords, interestCategories);
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        if (interestKeywords == null || interestKeywords.isEmpty()) {
+            log.warn("No interest keywords provided for portCode: {}", portCode);
+            response.put("query", "");
+            response.put("results", List.<QuerySolution>of());
+            return response;
+        }
+        
+        // Build FILTER conditions for each interest keyword
+        StringBuilder filterConditions = new StringBuilder();
+        for (int i = 0; i < interestKeywords.size(); i++) {
+            String keyword = interestKeywords.get(i).trim();
+            if (!keyword.isEmpty()) {
+                if (filterConditions.length() > 0) {
+                    filterConditions.append(" || ");
+                }
+                // Escape special characters for SPARQL
+                String escapedKeyword = keyword.replace("\"", "\\\"").replace("'", "\\'");
+                filterConditions.append(String.format("CONTAINS(LCASE(?label), LCASE(\"%s\"))", escapedKeyword));
+            }
+        }
+        
+        if (filterConditions.length() == 0) {
+            log.warn("No valid interest keywords after filtering for portCode: {}", portCode);
+            response.put("query", "");
+            response.put("results", List.<QuerySolution>of());
+            return response;
+        }
+        
+        // Build category-specific concept type filters
+        StringBuilder conceptTypeFilter = new StringBuilder();
+        if (interestCategories != null && !interestCategories.isEmpty()) {
+            for (String category : interestCategories) {
+                String conceptType = mapCategoryToConceptType(category);
+                if (conceptType != null) {
+                    if (conceptTypeFilter.length() > 0) {
+                        conceptTypeFilter.append(" || ");
+                    }
+                    conceptTypeFilter.append(String.format("STRSTARTS(STR(?concept), \"%sconcept/%s\")", namespace, conceptType));
+                }
+            }
+        }
+        
+        String query = String.format("""
+            PREFIX cruise: <%s>
+            PREFIX skos: <%s>
+            PREFIX dcterms: <%s>
+            
+            SELECT DISTINCT ?port ?name ?concept ?label WHERE {
+                ?port a cruise:Port .
+                ?port skos:prefLabel ?name .
+                ?port skos:altLabel "%s" .
+                ?port skos:related ?concept .
+                ?concept skos:prefLabel ?label .
+                FILTER (%s)
+                %s
+            }
+            ORDER BY ?name ?label
+            """, 
+            namespace, SKOS_NS, DCTERMS_NS, portCode, 
+            filterConditions.toString(),
+            conceptTypeFilter.length() > 0 ? String.format("FILTER (%s)", conceptTypeFilter.toString()) : "");
+        
+        log.info("Executing SPARQL query for portCode {}:\n{}", portCode, query);
+        log.debug("Filter conditions: {}", filterConditions.toString());
+        log.debug("Concept type filter: {}", conceptTypeFilter.length() > 0 ? conceptTypeFilter.toString() : "none");
+        
+        List<QuerySolution> results = queryPorts(query);
+        log.info("SPARQL query returned {} results for portCode: {}", results.size(), portCode);
+        
+        response.put("query", query);
+        response.put("results", results);
+        return response;
+    }
+    
+    /**
+     * Find port features/concepts matching passenger interests using SPARQL
+     * This queries the RDF knowledge graph for ports that match multiple interest categories
+     * @deprecated Use findPortFeaturesByInterestsWithQuery instead to get the query string
+     */
+    @Deprecated
+    public List<QuerySolution> findPortFeaturesByInterests(String portCode, List<String> interestKeywords, List<String> interestCategories) {
+        Map<String, Object> response = findPortFeaturesByInterestsWithQuery(portCode, interestKeywords, interestCategories);
+        return (List<QuerySolution>) response.get("results");
+    }
+    
+    /**
+     * Map interest category to RDF concept type
+     */
+    private String mapCategoryToConceptType(String category) {
+        if (category == null) return null;
+        
+        return switch (category.toUpperCase()) {
+            case "ACTIVITY" -> "activity";
+            case "ATTRACTION" -> "attraction";
+            case "MEAL_VENUE" -> "mealvenue";
+            case "RESTAURANT" -> "cuisine";
+            case "CULINARY_INGREDIENTS" -> "cuisine"; // Map to cuisine concept type
+            case "EXCURSION" -> "excursion";
+            case "GENERAL" -> "general";
+            default -> null;
+        };
     }
 }
 

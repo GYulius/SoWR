@@ -23,8 +23,27 @@ public class JwtTokenProvider {
     public JwtTokenProvider(
             @Value("${jwt.secret}") String jwtSecret,
             @Value("${jwt.expiration}") long jwtExpirationInMs) {
-        this.secretKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        // Validate JWT secret length (must be at least 32 characters/256 bits for HMAC-SHA256)
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                "JWT secret is not configured. Please set JWT_SECRET environment variable to a secure random string (at least 32 characters).");
+        }
+        
+        byte[] secretBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < 32) {
+            throw new IllegalArgumentException(
+                String.format("JWT secret is too short (%d bytes). Must be at least 32 bytes (256 bits) for HMAC-SHA256. " +
+                    "Please set JWT_SECRET environment variable to a longer secure random string.", secretBytes.length));
+        }
+        
+        // Warn if using development default
+        if (jwtSecret.contains("dev-secret-key-change-in-production")) {
+            log.warn("⚠️  WARNING: Using development JWT secret! This should be changed in production by setting JWT_SECRET environment variable.");
+        }
+        
+        this.secretKey = Keys.hmacShaKeyFor(secretBytes);
         this.jwtExpirationInMs = jwtExpirationInMs;
+        log.info("JWT Token Provider initialized with secret length: {} bytes", secretBytes.length);
     }
     
     public String generateToken(String email, Long userId, String role) {

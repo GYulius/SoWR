@@ -176,6 +176,16 @@
                                     <small class="form-text text-muted">Enter keywords separated by commas</small>
                                 </div>
                                 
+                                <!-- Culinary Ingredients -->
+                                <div class="mb-4">
+                                    <label for="culinaryIngredientsInterests" class="form-label fw-bold">
+                                        <i class="fas fa-pepper-hot me-2"></i>Culinary Ingredients
+                                    </label>
+                                    <input type="text" class="form-control" id="culinaryIngredientsInterests" 
+                                           placeholder="e.g., Seafood, Spices, Local produce, Organic, Gluten-free">
+                                    <small class="form-text text-muted">Enter keywords separated by commas</small>
+                                </div>
+                                
                                 <!-- Shore Excursions -->
                                 <div class="mb-4">
                                     <label for="excursionInterests" class="form-label fw-bold">
@@ -322,6 +332,22 @@
                             </div>
                             <div class="card-body" id="mealVenuesContent">
                                 <p class="text-muted">Select a port to see recommendations</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SPARQL Recommendations Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-search me-2"></i>Knowledge Graph Recommendations (SPARQL)
+                                </h5>
+                            </div>
+                            <div class="card-body" id="sparqlRecommendationsContent">
+                                <p class="text-muted">Select a port to see SPARQL-based recommendations based on your interests</p>
                             </div>
                         </div>
                     </div>
@@ -849,17 +875,49 @@
         let shipMarkers = [];
         let allPorts = []; // Store all ports from database
         
+        // Frontend configuration (loaded from backend)
+        let frontendConfig = {
+            api: { basePath: '/api/v1' },
+            facebook: { appId: null, version: 'v24.0' },
+            knowledgeGraph: {},
+            features: {}
+        };
+        
+        // Load frontend configuration from backend
+        async function loadFrontendConfig() {
+            try {
+                // Try to get base path first (fallback logic)
+                let basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/config/frontend`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    frontendConfig = await response.json();
+                    console.log('Frontend configuration loaded:', frontendConfig);
+                    // Note: We don't override getBasePath() logic here - it handles port detection automatically
+                    // The config is used for other settings like Facebook App ID, endpoints, etc.
+                } else {
+                    console.warn('Could not load frontend config, using defaults');
+                }
+            } catch (error) {
+                console.warn('Error loading frontend configuration:', error);
+            }
+        }
+        
         // Get base path dynamically (handles context path and different servers)
         function getBasePath() {
-            // If accessing through Spring Boot server (port 8080), use context path
-            if (window.location.port === '8080' || window.location.hostname === 'localhost' && window.location.port === '') {
-                const path = window.location.pathname;
-                if (path.startsWith('/api/v1')) {
-                    return '/api/v1';
-                }
-                return '/api/v1'; // Default to context path for Spring Boot
+            const currentPort = window.location.port;
+            const isSpringBootPort = currentPort === '8080' || (window.location.hostname === 'localhost' && currentPort === '');
+            
+            // If accessing through Spring Boot server (port 8080), use relative context path
+            if (isSpringBootPort) {
+                return '/api/v1';
             }
-            // If accessing through IntelliJ web server or other, use full Spring Boot URL
+            
+            // If accessing through IntelliJ web server or other port, always use full Spring Boot URL
+            // This ensures API calls go to the correct server (port 8080) regardless of where HTML is served from
             return 'http://localhost:8080/api/v1';
         }
         
@@ -870,10 +928,11 @@
             getFacebookAppId().then(appId => {
                 if (appId) {
                     facebookAppId = appId;
+                    const fbVersion = frontendConfig.facebook?.version || 'v24.0';
                     FB.init({
                         appId: appId,
                         xfbml: true,
-                        version: 'v24.0'
+                        version: fbVersion
                     });
                     console.log('Facebook SDK initialized');
                 } else {
@@ -881,6 +940,9 @@
                 }
             });
         };
+        
+        // Load configuration when page loads
+        loadFrontendConfig();
         
         // Load ports from database API
         function loadPortsFromDatabase() {
@@ -1278,44 +1340,48 @@
         }
         
         // Check if user is logged in
+        // This checks both localStorage token and cookies (for admin navigation)
         function checkLoginStatus() {
-            const token = localStorage.getItem('token');
-            if (token) {
-                // Try to get user info
-                fetch(`${getBasePath()}/auth/me`, {
-                    headers: getAuthHeaders(),
-                    credentials: 'include'
-                })
-                .then(response => {
-                    if (response.ok) {
-                        return response.json();
+            // Always try to check authentication via cookies, even if no localStorage token
+            // This allows navigation from admin pages where token is in cookies
+            fetch(`${getBasePath()}/auth/me`, {
+                headers: getAuthHeaders(),
+                credentials: 'include'  // Include cookies for authentication
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                return null;
+            })
+            .then(user => {
+                if (user) {
+                    // User is authenticated (via cookie or localStorage token)
+                    showUserInterface(user);
+                    // Store token in localStorage if we got user info but didn't have token
+                    if (!localStorage.getItem('token') && user.token) {
+                        localStorage.setItem('token', user.token);
                     }
-                    return null;
-                })
-                .then(user => {
-                    if (user) {
-                        showUserInterface(user);
-                    } else {
-                        // Token invalid, clear it
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('user');
-                        // Reset UI to public view
-                        document.getElementById('heroSection').style.display = 'block';
-                        document.getElementById('myInterestsNavItem').style.display = 'none';
-                        document.getElementById('myPersonalInterests').style.display = 'none';
-                        document.getElementById('userRecommendations').style.display = 'none';
-                    }
-                })
-                .catch(() => {
-                    // Error fetching user info
-                });
-            } else {
-                // Not logged in - ensure public view
+                } else {
+                    // Not authenticated - clear any stored tokens
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    // Reset UI to public view
+                    document.getElementById('heroSection').style.display = 'block';
+                    document.getElementById('myInterestsNavItem').style.display = 'none';
+                    document.getElementById('myPersonalInterests').style.display = 'none';
+                    document.getElementById('userRecommendations').style.display = 'none';
+                }
+            })
+            .catch(() => {
+                // Error fetching user info - assume not logged in
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
                 document.getElementById('heroSection').style.display = 'block';
                 document.getElementById('myInterestsNavItem').style.display = 'none';
                 document.getElementById('myPersonalInterests').style.display = 'none';
                 document.getElementById('userRecommendations').style.display = 'none';
-            }
+            });
         }
         
         // Show user interface after login
@@ -1418,7 +1484,7 @@
                     
                     // Handle redirect based on role
                     if (data.role === 'ADMIN') {
-                        // Open admin maintenance in a new window
+                        // Navigate to admin maintenance in the same window
                         const currentPort = window.location.port;
                         let adminUrl;
                         if (currentPort === '63342' || currentPort === '') {
@@ -1426,7 +1492,7 @@
                         } else {
                             adminUrl = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
                         }
-                        window.open(adminUrl, '_blank', 'width=1400,height=900');
+                        window.location.href = adminUrl;
                     } else {
                         // Show user interface on current page
                         showUserInterface(data);
@@ -1589,6 +1655,29 @@
                     document.getElementById('mealVenuesContent').innerHTML = '<p class="text-muted">Error loading meal venues.</p>';
                 }
                 
+                // Load SPARQL-based recommendations using passenger interests
+                try {
+                    const sparqlResponse = await fetch(`${basePath}/passengers/${passengerId}/sparql-recommendations?portId=${portId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (sparqlResponse.ok) {
+                        const sparqlData = await sparqlResponse.json();
+                        console.log('SPARQL recommendations response:', sparqlData);
+                        displaySparqlRecommendations(sparqlData);
+                    } else {
+                        const errorText = await sparqlResponse.text();
+                        console.error('SPARQL recommendations error:', sparqlResponse.status, errorText);
+                        document.getElementById('sparqlRecommendationsContent').innerHTML = 
+                            `<p class="text-warning">SPARQL query failed (${sparqlResponse.status}): ${errorText.substring(0, 200)}</p>`;
+                    }
+                } catch (e) {
+                    console.error('Error loading SPARQL recommendations:', e);
+                    document.getElementById('sparqlRecommendationsContent').innerHTML = 
+                        `<p class="text-danger">Error loading SPARQL recommendations: ${e.message}</p>`;
+                }
+                
                 document.getElementById('userRecommendationsContent').style.display = 'block';
             } catch (error) {
                 console.error('Error loading user recommendations:', error);
@@ -1714,6 +1803,111 @@
             content.innerHTML = html;
         }
         
+        // Display SPARQL-based recommendations
+        function displaySparqlRecommendations(sparqlData) {
+            const content = document.getElementById('sparqlRecommendationsContent');
+            
+            // Show debug information
+            const debug = sparqlData.debug || {};
+            const portCode = debug.portCode || sparqlData.portCode || 'Unknown';
+            const interestKeywords = debug.interestKeywords || [];
+            const interestCategories = debug.interestCategories || [];
+            
+            if (!sparqlData || !sparqlData.matchingFeatures || sparqlData.matchingFeatures.length === 0) {
+                let html = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>No matching features found</strong> based on your interests.
+                    </div>
+                    <div class="card bg-light mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-bug me-2"></i>Debug Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Port Code:</strong> ${portCode}</p>
+                            <p><strong>Port Name:</strong> ${sparqlData.portName || 'Unknown'}</p>
+                            <p><strong>Interest Keywords:</strong> ${interestKeywords.length > 0 ? interestKeywords.join(', ') : 'None'}</p>
+                            <p><strong>Interest Categories:</strong> ${interestCategories.length > 0 ? interestCategories.join(', ') : 'None'}</p>
+                            <p><strong>Total Interests:</strong> ${sparqlData.interestCount || 0}</p>
+                            <p><strong>SPARQL Results:</strong> ${debug.sparqlResultsCount || 0}</p>
+                            ${debug.executedQuery ? `
+                                <div class="mt-3">
+                                    <strong>Executed SPARQL Query:</strong>
+                                    <pre class="bg-dark text-light p-2 rounded small mt-2" style="max-height: 300px; overflow-y: auto;">${debug.executedQuery}</pre>
+                                </div>
+                            ` : ''}
+                            <p class="text-muted small mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Possible reasons: RDF dataset not created for this port, interests don't match port concepts, or port code mismatch.
+                                ${debug.executedQuery ? 'The query above was executed against the knowledge graph.' : 'Check server logs for the executed SPARQL query.'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                content.innerHTML = html;
+                return;
+            }
+            
+            const features = sparqlData.matchingFeatures;
+            const portName = sparqlData.portName || 'Selected Port';
+            const interestCount = sparqlData.interestCount || 0;
+            const matchingCount = sparqlData.matchingFeaturesCount || 0;
+            
+            let html = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Found <strong>${matchingCount}</strong> matching features at <strong>${portName}</strong> (${portCode}) based on your <strong>${interestCount}</strong> saved interests (including Culinary Ingredients).
+                </div>
+                <ul class="list-group list-group-flush mb-3">
+            `;
+            
+            features.forEach(feature => {
+                const label = feature.label || 'Feature';
+                const concept = feature.concept || '';
+                const category = feature.category || '';
+                html += `
+                    <li class="list-group-item">
+                        <h6><i class="fas fa-check-circle text-success me-2"></i>${label}</h6>
+                        ${category ? `<small class="text-muted"><i class="fas fa-tag me-1"></i>${category}</small>` : ''}
+                        ${concept ? `<br><small class="text-muted"><i class="fas fa-link me-1"></i>${concept}</small>` : ''}
+                    </li>
+                `;
+            });
+            
+            html += '</ul>';
+            
+            // Add debug information in a collapsible section
+            html += `
+                <div class="card bg-light">
+                    <div class="card-header">
+                        <button class="btn btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#sparqlDebugInfo" aria-expanded="false">
+                            <i class="fas fa-bug me-2"></i>Debug Information <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div class="collapse" id="sparqlDebugInfo">
+                        <div class="card-body">
+                            <p><strong>Port Code:</strong> ${portCode}</p>
+                            <p><strong>Interest Keywords:</strong> ${interestKeywords.length > 0 ? interestKeywords.join(', ') : 'None'}</p>
+                            <p><strong>Interest Categories:</strong> ${interestCategories.length > 0 ? interestCategories.join(', ') : 'None'}</p>
+                            <p><strong>SPARQL Results Count:</strong> ${debug.sparqlResultsCount || 0}</p>
+                            ${debug.executedQuery ? `
+                                <div class="mt-3">
+                                    <strong>Executed SPARQL Query:</strong>
+                                    <pre class="bg-dark text-light p-2 rounded small mt-2" style="max-height: 300px; overflow-y: auto;">${debug.executedQuery}</pre>
+                                </div>
+                            ` : ''}
+                            <p class="text-muted small mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                ${debug.executedQuery ? 'The query above was executed against the knowledge graph.' : 'Check server logs for the full executed SPARQL query.'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            content.innerHTML = html;
+        }
+        
         // Logout function
         async function logout() {
             try {
@@ -1762,10 +1956,11 @@
                         return;
                     }
                     facebookAppId = appId;
+                    const fbVersion = frontendConfig.facebook?.version || 'v24.0';
                     FB.init({
                         appId: appId,
                         xfbml: true,
-                        version: 'v24.0'
+                        version: fbVersion
                     });
                 }
                 
@@ -1844,8 +2039,14 @@
             }
         }
         
-        // Helper function to get Facebook App ID from backend
+        // Helper function to get Facebook App ID from backend or config
         async function getFacebookAppId() {
+            // First check if we have it in the loaded config
+            if (frontendConfig.facebook && frontendConfig.facebook.appId) {
+                return frontendConfig.facebook.appId;
+            }
+            
+            // Fallback to the old endpoint for backward compatibility
             const basePath = getBasePath();
             try {
                 const response = await fetch(`${basePath}/auth/facebook/config`, {
@@ -1855,6 +2056,10 @@
                 
                 if (response.ok) {
                     const config = await response.json();
+                    // Update frontend config cache
+                    if (config.appId) {
+                        frontendConfig.facebook.appId = config.appId;
+                    }
                     return config.appId;
                 }
             } catch (error) {
@@ -1944,6 +2149,9 @@
                     }
                     if (interestsByCategory['RESTAURANT']) {
                         document.getElementById('restaurantInterests').value = interestsByCategory['RESTAURANT'].join(', ');
+                    }
+                    if (interestsByCategory['CULINARY_INGREDIENTS']) {
+                        document.getElementById('culinaryIngredientsInterests').value = interestsByCategory['CULINARY_INGREDIENTS'].join(', ');
                     }
                     if (interestsByCategory['EXCURSION']) {
                         document.getElementById('excursionInterests').value = interestsByCategory['EXCURSION'].join(', ');
@@ -2100,6 +2308,7 @@
                 addInterests('ATTRACTION', document.getElementById('attractionInterests').value);
                 addInterests('MEAL_VENUE', document.getElementById('mealVenueInterests').value);
                 addInterests('RESTAURANT', document.getElementById('restaurantInterests').value);
+                addInterests('CULINARY_INGREDIENTS', document.getElementById('culinaryIngredientsInterests').value);
                 addInterests('EXCURSION', document.getElementById('excursionInterests').value);
                 addInterests('GENERAL', document.getElementById('generalInterests').value);
                 

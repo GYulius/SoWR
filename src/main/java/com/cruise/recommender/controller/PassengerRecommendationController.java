@@ -5,8 +5,10 @@ import com.cruise.recommender.dto.PassengerRecommendationResponse;
 import com.cruise.recommender.entity.*;
 import com.cruise.recommender.repository.*;
 import com.cruise.recommender.service.MealVenueRecommendationService;
+import com.cruise.recommender.service.PortRdfService;
 import com.cruise.recommender.service.ShoreExcursionRecommendationService;
 import com.cruise.recommender.service.SocialMediaAnalysisService;
+import org.apache.jena.query.QuerySolution;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,7 +21,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,6 +42,7 @@ public class PassengerRecommendationController {
     private final ShoreExcursionRecommendationService shoreExcursionService;
     private final MealVenueRecommendationService mealVenueService;
     private final SocialMediaAnalysisService socialMediaService;
+    private final PortRdfService portRdfService;
     private final PassengerRepository passengerRepository;
     private final PassengerInterestRepository passengerInterestRepository;
     private final com.cruise.recommender.repository.UserRepository userRepository;
@@ -346,6 +351,100 @@ public class PassengerRecommendationController {
                 .collect(Collectors.toList());
         
         return ResponseEntity.ok(responses);
+    }
+    
+    @GetMapping("/{passengerId}/sparql-recommendations")
+    @Operation(summary = "Get SPARQL-based recommendations for passenger at port", 
+               description = "Uses SPARQL queries on knowledge graph to find port features matching passenger interests")
+    public ResponseEntity<Map<String, Object>> getSparqlRecommendations(
+            @Parameter(description = "Passenger ID") @PathVariable Long passengerId,
+            @Parameter(description = "Port ID") @RequestParam Long portId) {
+        
+        log.info("Getting SPARQL-based recommendations for passenger {} at port {}", 
+                passengerId, portId);
+        
+        Passenger passenger = passengerRepository.findById(passengerId)
+                .orElseThrow(() -> new RuntimeException("Passenger not found"));
+        
+        Port port = portRepository.findById(portId)
+                .orElseThrow(() -> new RuntimeException("Port not found"));
+        
+        // Get passenger interests
+        List<PassengerInterest> interests = passengerInterestRepository.findByPassenger(passenger);
+        
+        log.info("Found {} interests for passenger {}: {}", interests.size(), passengerId, 
+                interests.stream()
+                    .map(i -> i.getInterestCategory() + ":" + i.getInterestKeyword())
+                    .collect(Collectors.joining(", ")));
+        
+        // Extract keywords and categories
+        List<String> interestKeywords = interests.stream()
+                .map(PassengerInterest::getInterestKeyword)
+                .filter(kw -> kw != null && !kw.trim().isEmpty())
+                .collect(Collectors.toList());
+        
+        List<String> interestCategories = interests.stream()
+                .map(PassengerInterest::getInterestCategory)
+                .filter(cat -> cat != null && !cat.trim().isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        log.info("Extracted {} keywords and {} categories for SPARQL query. Port: {} (code: {})", 
+                interestKeywords.size(), interestCategories.size(), port.getName(), port.getPortCode());
+        
+        // Query SPARQL knowledge graph
+        Map<String, Object> sparqlResponse = portRdfService.findPortFeaturesByInterestsWithQuery(
+                port.getPortCode(), interestKeywords, interestCategories);
+        
+        @SuppressWarnings("unchecked")
+        List<QuerySolution> sparqlResults = (List<QuerySolution>) sparqlResponse.get("results");
+        String executedQuery = (String) sparqlResponse.get("query");
+        
+        log.info("SPARQL query returned {} matching features for passenger {} at port {}", 
+                sparqlResults.size(), passengerId, port.getPortCode());
+        
+        // Convert results to response format
+        List<Map<String, String>> features = sparqlResults.stream()
+                .map(solution -> {
+                    Map<String, String> feature = new HashMap<>();
+                    if (solution.get("concept") != null) {
+                        feature.put("concept", solution.get("concept").toString());
+                        // Extract category from concept URI
+                        String conceptUri = solution.get("concept").toString();
+                        if (conceptUri.contains("/concept/")) {
+                            String[] parts = conceptUri.split("/concept/");
+                            if (parts.length > 1) {
+                                String category = parts[1].split("/")[0];
+                                feature.put("category", category);
+                            }
+                        }
+                    }
+                    if (solution.get("label") != null) {
+                        feature.put("label", solution.get("label").toString());
+                    }
+                    return feature;
+                })
+                .collect(Collectors.toList());
+        
+        // Build debug information
+        Map<String, Object> debugInfo = new HashMap<>();
+        debugInfo.put("portCode", port.getPortCode());
+        debugInfo.put("interestKeywords", interestKeywords);
+        debugInfo.put("interestCategories", interestCategories);
+        debugInfo.put("sparqlResultsCount", sparqlResults.size());
+        debugInfo.put("executedQuery", executedQuery);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("passengerId", passengerId);
+        response.put("portId", portId);
+        response.put("portCode", port.getPortCode());
+        response.put("portName", port.getName());
+        response.put("interestCount", interests.size());
+        response.put("matchingFeaturesCount", features.size());
+        response.put("matchingFeatures", features);
+        response.put("debug", debugInfo);
+        
+        return ResponseEntity.ok(response);
     }
     
     // DTOs
