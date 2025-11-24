@@ -570,7 +570,9 @@
         let portsState = {
             search: '',
             sortBy: null,
-            sortDir: 'ASC'
+            sortDir: 'ASC',
+            page: 0,
+            size: 10000  // Load all ports at once to avoid pagination issues
         };
         
         // Leaflet map for port editing
@@ -631,7 +633,7 @@
         
         async function loadPorts() {
             try {
-                let url = `${getBasePath()}/admin/ports?size=100`;
+                let url = `${getBasePath()}/admin/ports?page=${portsState.page}&size=${portsState.size}`;
                 if (portsState.search) {
                     url += `&search=${encodeURIComponent(portsState.search)}`;
                 }
@@ -670,8 +672,76 @@
                                 </td>
                             `;
                         });
+                        
+                        // Display pagination info
+                        const totalElements = data.totalElements || data.content.length;
+                        const totalPages = data.totalPages || 1;
+                        const currentPage = data.number !== undefined ? data.number + 1 : 1;
+                        const pageSize = data.size || data.content.length;
+                        const startElement = ((currentPage - 1) * pageSize) + 1;
+                        const endElement = Math.min(startElement + data.content.length - 1, totalElements);
+                        
+                        // Update pagination info display
+                        // Find the table-responsive container to append pagination after it
+                        const tableContainer = tbody.closest('.table-responsive');
+                        const cardBody = tableContainer ? tableContainer.parentElement : tbody.parentElement.parentElement;
+                        
+                        let paginationInfo = document.getElementById('portsPaginationInfo');
+                        if (!paginationInfo) {
+                            // Create pagination info element if it doesn't exist
+                            paginationInfo = document.createElement('div');
+                            paginationInfo.id = 'portsPaginationInfo';
+                            paginationInfo.className = 'mt-2 text-muted small';
+                            cardBody.appendChild(paginationInfo);
+                        }
+                        paginationInfo.innerHTML = `Showing ${startElement}-${endElement} of ${totalElements} ports`;
+                        
+                        // Add pagination controls if there are multiple pages
+                        let paginationControls = document.getElementById('portsPaginationControls');
+                        if (totalPages > 1 && !paginationControls) {
+                            paginationControls = document.createElement('nav');
+                            paginationControls.id = 'portsPaginationControls';
+                            paginationControls.setAttribute('aria-label', 'Ports pagination');
+                            paginationControls.innerHTML = `
+                                <ul class="pagination justify-content-center mt-3">
+                                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                                        <a class="page-link" href="#" onclick="goToPortsPage(${currentPage - 1}); return false;">Previous</a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Page ${currentPage} of ${totalPages}</span>
+                                    </li>
+                                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                                        <a class="page-link" href="#" onclick="goToPortsPage(${currentPage + 1}); return false;">Next</a>
+                                    </li>
+                                </ul>
+                            `;
+                            cardBody.appendChild(paginationControls);
+                        } else if (totalPages > 1 && paginationControls) {
+                            // Update existing pagination controls
+                            paginationControls.innerHTML = `
+                                <ul class="pagination justify-content-center mt-3">
+                                    <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                                        <a class="page-link" href="#" onclick="goToPortsPage(${currentPage - 1}); return false;">Previous</a>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Page ${currentPage} of ${totalPages}</span>
+                                    </li>
+                                    <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                                        <a class="page-link" href="#" onclick="goToPortsPage(${currentPage + 1}); return false;">Next</a>
+                                    </li>
+                                </ul>
+                            `;
+                        } else if (paginationControls) {
+                            // Remove pagination controls if not needed
+                            paginationControls.remove();
+                        }
                     } else {
                         tbody.innerHTML = '<tr><td colspan="7" class="text-center">No ports found</td></tr>';
+                        // Clear pagination info
+                        const paginationInfo = document.getElementById('portsPaginationInfo');
+                        if (paginationInfo) paginationInfo.innerHTML = '';
+                        const paginationControls = document.getElementById('portsPaginationControls');
+                        if (paginationControls) paginationControls.remove();
                     }
                 } else {
                     const errorText = await response.text();
@@ -690,19 +760,29 @@
             }
         }
         
+        function goToPortsPage(page) {
+            if (page < 0) return;
+            portsState.page = page - 1; // API uses 0-based indexing
+            loadPorts();
+        }
+        
         function handlePortsSearch() {
             const searchValue = document.getElementById('portsSearch').value;
             portsState.search = searchValue;
+            portsState.page = 0; // Reset to first page when searching
             loadPorts();
         }
         
         function clearPortsSearch() {
             document.getElementById('portsSearch').value = '';
             portsState.search = '';
+            portsState.page = 0; // Reset to first page when clearing search
             loadPorts();
         }
         
         function sortPorts(field) {
+            // Reset to first page when sorting
+            portsState.page = 0;
             // Toggle sort direction if same field
             if (portsState.sortBy === field) {
                 portsState.sortDir = portsState.sortDir === 'ASC' ? 'DESC' : 'ASC';

@@ -57,6 +57,11 @@
                             <li><a class="dropdown-item" href="?lang=de">Deutsch</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item" id="adminMaintenanceNavItem" style="display: none;">
+                        <a class="nav-link" href="#" id="adminMaintenanceLink">
+                            <i class="fas fa-tools me-1"></i>Admin Maintenance
+                        </a>
+                    </li>
                     <li class="nav-item" id="loginNavItem">
                         <a class="nav-link" href="#" onclick="showLoginModal(); return false;">
                             <i class="fas fa-sign-in-alt me-1"></i><span th:text="#{nav.login}">Login</span>
@@ -861,8 +866,8 @@
          * Leaflet map initialization
          * @global {Object} L - Leaflet library loaded from CDN
          */
-        // Initialize map (will be centered when port is selected)
-        let map = L.map('map').setView([41.3851, 2.1734], 6); // Default: Barcelona area
+        // Initialize map with worldwide view (minimal zoom)
+        let map = L.map('map').setView([0, 0], 2); // Worldwide view
         
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -871,7 +876,8 @@
         }).addTo(map);
         
         // Global variables for map markers
-        let portMarker = null;
+        let portMarker = null; // Selected port marker (highlighted)
+        let allPortMarkers = []; // All port markers displayed on map
         let shipMarkers = [];
         let allPorts = []; // Store all ports from database
         
@@ -1014,6 +1020,9 @@
                     if (portsAdded === 0) {
                         document.getElementById('portCount').textContent = 'No ports with valid coordinates found';
                         console.warn('No ports with valid coordinates found');
+                    } else {
+                        // Display all ports as markers on the map
+                        displayAllPortsMarkers();
                     }
                 })
                 .catch(error => {
@@ -1063,12 +1072,18 @@
             const portId = this.value;
             
             if (!portId || portId === '') {
-                // Reset map to default view
-                map.setView([41.3851, 2.1734], 6);
+                // Reset map to worldwide view
+                map.flyTo([0, 0], 2, {
+                    duration: 1.0
+                });
                 document.getElementById('portInfo').style.display = 'none';
                 document.getElementById('portCardsContainer').innerHTML = 
                     '<div class="col-12 text-center"><p class="text-muted">Select a port to view details</p></div>';
                 clearMarkers();
+                // Ensure all port markers are visible
+                if (allPortMarkers.length === 0 && allPorts.length > 0) {
+                    displayAllPortsMarkers();
+                }
                 return;
             }
             
@@ -1118,24 +1133,34 @@
                 `;
             }
             
-            // Center map on port with proper zoom
-            map.setView([lat, lng], 13);
+            // Animate map to port location with zoom-in
+            map.flyTo([lat, lng], 13, {
+                duration: 1.5,
+                easeLinearity: 0.25
+            });
             map.invalidateSize(); // Ensure map resizes properly
             
-            // Clear existing markers
+            // Clear selected port marker and ship markers (keep all port markers)
             clearMarkers();
             
-            // Add port marker
-            portMarker = L.marker([lat, lng])
+            // Create a highlighted icon for the selected port
+            const selectedPortIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                iconSize: [35, 50],
+                iconAnchor: [17, 50],
+                popupAnchor: [1, -34]
+            });
+            
+            // Add highlighted port marker
+            portMarker = L.marker([lat, lng], {icon: selectedPortIcon})
                 .addTo(map)
                 .bindPopup(`<b>${portName}</b><br>Port Code: ${selectedOption.text.split('(')[1]?.split(')')[0] || 'N/A'}${country ? '<br>Country: ' + country : ''}`)
                 .openPopup();
             
-            // Ensure map view is updated after a brief delay
+            // Ensure map view is updated after animation completes
             setTimeout(() => {
                 map.invalidateSize();
-                map.setView([lat, lng], 13);
-            }, 100);
+            }, 1600);
             
             // Fetch ships near this port
             loadShipsNearPort(lat, lng);
@@ -1212,7 +1237,41 @@
         });
         
         /**
-         * Clear all markers from the map
+         * Display all ports as markers on the map
+         */
+        function displayAllPortsMarkers() {
+            // Clear existing port markers
+            allPortMarkers.forEach(marker => map.removeLayer(marker));
+            allPortMarkers = [];
+            
+            // Create a simple icon for port markers
+            const portIcon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                iconSize: [20, 34],
+                iconAnchor: [10, 34],
+                popupAnchor: [1, -34]
+            });
+            
+            // Add markers for all ports with valid coordinates
+            allPorts.forEach(port => {
+                if (port && port.latitude != null && port.longitude != null && 
+                    !isNaN(port.latitude) && !isNaN(port.longitude) &&
+                    port.latitude !== 0 && port.longitude !== 0) {
+                    
+                    const marker = L.marker([port.latitude, port.longitude], {icon: portIcon})
+                        .addTo(map)
+                        .bindPopup(`<b>${port.name || 'Unknown'}</b><br>${port.portCode || 'N/A'} - ${port.country || 'Unknown'}`);
+                    
+                    allPortMarkers.push(marker);
+                }
+            });
+            
+            console.log(`Displayed ${allPortMarkers.length} port markers on map`);
+        }
+        
+        /**
+         * Clear selected port marker and ship markers from the map
+         * (Keeps all port markers visible)
          * map.removeLayer is a Leaflet method
          */
         function clearMarkers() {
@@ -1369,6 +1428,7 @@
                     // Reset UI to public view
                     document.getElementById('heroSection').style.display = 'block';
                     document.getElementById('myInterestsNavItem').style.display = 'none';
+                    document.getElementById('adminMaintenanceNavItem').style.display = 'none';
                     document.getElementById('myPersonalInterests').style.display = 'none';
                     document.getElementById('userRecommendations').style.display = 'none';
                 }
@@ -1379,6 +1439,7 @@
                 localStorage.removeItem('user');
                 document.getElementById('heroSection').style.display = 'block';
                 document.getElementById('myInterestsNavItem').style.display = 'none';
+                document.getElementById('adminMaintenanceNavItem').style.display = 'none';
                 document.getElementById('myPersonalInterests').style.display = 'none';
                 document.getElementById('userRecommendations').style.display = 'none';
             });
@@ -1402,6 +1463,9 @@
                 // Show "My Interests" navigation link
                 document.getElementById('myInterestsNavItem').style.display = 'block';
                 
+                // Hide admin maintenance link for USER role
+                document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+                
                 // Show interests section first (replaces hero section)
                 document.getElementById('myPersonalInterests').style.display = 'block';
                 
@@ -1420,12 +1484,29 @@
                 
                 // Load saved interests
                 loadSavedInterests();
-            } else {
+            } else if (user.role === 'ADMIN') {
                 // ADMIN users don't see these sections
                 document.getElementById('heroSection').style.display = 'block';
                 document.getElementById('myInterestsNavItem').style.display = 'none';
                 document.getElementById('myPersonalInterests').style.display = 'none';
                 document.getElementById('userRecommendations').style.display = 'none';
+                
+                // Show admin maintenance link
+                document.getElementById('adminMaintenanceNavItem').style.display = 'block';
+                
+                // Set admin maintenance link URL
+                const basePath = getBasePath();
+                const currentPort = window.location.port;
+                let adminUrl;
+                if (currentPort === '63342' || currentPort === '') {
+                    adminUrl = `http://localhost:8080/api/v1/admin/maintenance`;
+                } else {
+                    adminUrl = `${basePath}/admin/maintenance`;
+                }
+                document.getElementById('adminMaintenanceLink').href = adminUrl;
+            } else {
+                // Other roles - hide admin link
+                document.getElementById('adminMaintenanceNavItem').style.display = 'none';
             }
         }
         
@@ -1932,154 +2013,12 @@
             // Hide user interface, show login button
             document.getElementById('loginNavItem').style.display = 'block';
             document.getElementById('userNavItem').style.display = 'none';
+            document.getElementById('adminMaintenanceNavItem').style.display = 'none';
             document.getElementById('myInterestsNavItem').style.display = 'none';
             document.getElementById('heroSection').style.display = 'block';
             document.getElementById('userRecommendations').style.display = 'none';
             document.getElementById('userRecommendationsContent').style.display = 'none';
             document.getElementById('myPersonalInterests').style.display = 'none';
-        }
-        
-        // Social Login Functions
-        async function loginWithFacebook() {
-            try {
-                // Check if Facebook SDK is loaded
-                if (typeof FB === 'undefined') {
-                    alert('Facebook SDK is still loading. Please wait a moment and try again.');
-                    return;
-                }
-                
-                // Ensure Facebook SDK is initialized
-                if (!facebookAppId) {
-                    const appId = await getFacebookAppId().catch(() => null);
-                    if (!appId) {
-                        alert('Facebook login is not configured. Please contact the administrator.');
-                        return;
-                    }
-                    facebookAppId = appId;
-                    const fbVersion = frontendConfig.facebook?.version || 'v24.0';
-                    FB.init({
-                        appId: appId,
-                        xfbml: true,
-                        version: fbVersion
-                    });
-                }
-                
-                // Use Facebook SDK login dialog
-                FB.login(function(response) {
-                    if (response.authResponse) {
-                        console.log('Welcome! Fetching your information....');
-                        
-                        // Get user information from Facebook
-                        FB.api('/me', {fields: 'name,email'}, async function(userInfo) {
-                            try {
-                                const basePath = getBasePath();
-                                
-                                // Send Facebook access token and user info to backend for authentication
-                                const loginResponse = await fetch(`${basePath}/auth/facebook/login`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json'
-                                    },
-                                    credentials: 'include',
-                                    body: JSON.stringify({
-                                        accessToken: response.authResponse.accessToken,
-                                        userId: userInfo.id,
-                                        name: userInfo.name,
-                                        email: userInfo.email
-                                    })
-                                });
-                                
-                                if (loginResponse.ok) {
-                                    const authData = await loginResponse.json();
-                                    
-                                    // Store authentication data
-                                    if (authData.token) {
-                                        localStorage.setItem('token', authData.token);
-                                    }
-                                    if (authData.userId) {
-                                        localStorage.setItem('user', JSON.stringify({
-                                            userId: authData.userId,
-                                            email: authData.email,
-                                            firstName: authData.firstName,
-                                            lastName: authData.lastName,
-                                            role: authData.role
-                                        }));
-                                    }
-                                    
-                                    // Update UI
-                                    document.getElementById('loginNavItem').style.display = 'none';
-                                    document.getElementById('userNavItem').style.display = 'block';
-                                    document.getElementById('myInterestsNavItem').style.display = 'block';
-                                    
-                                    // Close login modal if open
-                                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-                                    if (loginModal) {
-                                        loginModal.hide();
-                                    }
-                                    
-                                    // Reload page to show user-specific content
-                                    window.location.reload();
-                                } else {
-                                    const error = await loginResponse.text();
-                                    alert('Facebook login failed: ' + error);
-                                }
-                            } catch (error) {
-                                console.error('Error processing Facebook login:', error);
-                                alert('Failed to complete Facebook login. Please try again.');
-                            }
-                        });
-                    } else {
-                        // User cancelled login or did not fully authorize
-                        console.log('User cancelled login or did not fully authorize.');
-                    }
-                }, {scope: 'email,public_profile'});
-            } catch (error) {
-                console.error('Facebook login error:', error);
-                alert('Failed to initiate Facebook login. Please try again.');
-            }
-        }
-        
-        // Helper function to get Facebook App ID from backend or config
-        async function getFacebookAppId() {
-            // First check if we have it in the loaded config
-            if (frontendConfig.facebook && frontendConfig.facebook.appId) {
-                return frontendConfig.facebook.appId;
-            }
-            
-            // Fallback to the old endpoint for backward compatibility
-            const basePath = getBasePath();
-            try {
-                const response = await fetch(`${basePath}/auth/facebook/config`, {
-                    method: 'GET',
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    const config = await response.json();
-                    // Update frontend config cache
-                    if (config.appId) {
-                        frontendConfig.facebook.appId = config.appId;
-                    }
-                    return config.appId;
-                }
-            } catch (error) {
-                console.warn('Could not fetch Facebook config from backend:', error);
-            }
-            
-            // Fallback: return null to indicate configuration is needed
-            return null;
-        }
-        
-        function loginWithTwitter() {
-            alert('Twitter login will be implemented. For now, please use email/password login.');
-            // TODO: Implement Twitter OAuth
-            // window.location.href = '/auth/twitter';
-        }
-        
-        function loginWithTikTok() {
-            alert('TikTok login will be implemented. For now, please use email/password login.');
-            // TODO: Implement TikTok OAuth
-            // window.location.href = '/auth/tiktok';
         }
         
         // Load saved interests
@@ -2478,5 +2417,8 @@
             }, 2000); // Wait 2 seconds for map to load
         }
     </script>
+    
+    <!-- Social Login Functions -->
+    <script th:src="@{/static/js/security/social-login.js}" src="/static/js/security/social-login.js"></script>
 </body>
 </html>
