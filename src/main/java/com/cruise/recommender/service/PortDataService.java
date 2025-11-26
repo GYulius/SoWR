@@ -20,7 +20,13 @@ import java.util.stream.Collectors;
 public class PortDataService {
     
     private List<PortData> allPorts = new ArrayList<>();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+    
+    public PortDataService() {
+        this.objectMapper = new ObjectMapper();
+        // Enable lenient JSON parsing to handle trailing commas
+        this.objectMapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_TRAILING_COMMA, true);
+    }
     
     // Port code mappings for common ports
     private static final Map<String, String> PORT_CODE_MAPPINGS = Map.of(
@@ -51,10 +57,25 @@ public class PortDataService {
                     return;
                 }
             }
-            allPorts = objectMapper.readValue(inputStream, new TypeReference<List<PortData>>() {});
+            
+            // Read file content and clean up invalid JSON (trailing commas)
+            java.util.Scanner scanner = new java.util.Scanner(inputStream, "UTF-8").useDelimiter("\\A");
+            String content = scanner.hasNext() ? scanner.next() : "";
+            scanner.close();
+            
+            // Remove trailing commas that are invalid JSON (only before ] at end of array)
+            // Pattern: }, followed by whitespace/newlines, then ] (end of array)
+            // This only removes trailing commas before the closing bracket, not between elements
+            content = content.replaceAll("},\\s*\\n\\s*\\]", "}\n]");
+            // Also handle standalone trailing comma before closing bracket
+            content = content.replaceAll(",\\s*\\n\\s*\\]", "\n]");
+            
+            // Parse cleaned JSON (ObjectMapper already configured in constructor to allow trailing commas)
+            allPorts = objectMapper.readValue(content, new TypeReference<List<PortData>>() {});
             log.info("Loaded {} ports from all_RCI_ports.json", allPorts.size());
         } catch (Exception e) {
             log.error("Error loading ports from JSON file", e);
+            log.warn("Port data will not be available. Some features may be limited.");
             allPorts = new ArrayList<>();
         }
     }

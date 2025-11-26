@@ -7,25 +7,27 @@ import com.cruise.recommender.repository.CruiseShipRepository;
 import com.cruise.recommender.repository.elasticsearch.AisDataDocument;
 import com.cruise.recommender.repository.elasticsearch.AisDataDocumentMapper;
 import com.cruise.recommender.repository.elasticsearch.AisDataElasticsearchRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Service for processing AIS (Automatic Identification System) data
  * Handles real-time ship tracking and position updates
+ * 
+ * Note: Elasticsearch is optional - service will work without it, but search features will be limited
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class AisDataService {
@@ -33,10 +35,34 @@ public class AisDataService {
     private final AisDataRepository aisDataRepository;
     private final CruiseShipRepository cruiseShipRepository;
     private final RabbitTemplate rabbitTemplate;
-    private final ElasticsearchOperations elasticsearchOperations;
-    private final AisDataElasticsearchRepository aisDataElasticsearchRepository;
     private final AisDataDocumentMapper documentMapper;
     private final KnowledgeGraphSparkService knowledgeGraphService;
+    
+    // Optional Elasticsearch dependencies - will be null if Elasticsearch is disabled
+    private final ElasticsearchOperations elasticsearchOperations;
+    private final AisDataElasticsearchRepository aisDataElasticsearchRepository;
+    
+    @Autowired
+    public AisDataService(
+            AisDataRepository aisDataRepository,
+            CruiseShipRepository cruiseShipRepository,
+            RabbitTemplate rabbitTemplate,
+            AisDataDocumentMapper documentMapper,
+            KnowledgeGraphSparkService knowledgeGraphService,
+            @Autowired(required = false) ElasticsearchOperations elasticsearchOperations,
+            @Autowired(required = false) AisDataElasticsearchRepository aisDataElasticsearchRepository) {
+        this.aisDataRepository = aisDataRepository;
+        this.cruiseShipRepository = cruiseShipRepository;
+        this.rabbitTemplate = rabbitTemplate;
+        this.documentMapper = documentMapper;
+        this.knowledgeGraphService = knowledgeGraphService;
+        this.elasticsearchOperations = elasticsearchOperations;
+        this.aisDataElasticsearchRepository = aisDataElasticsearchRepository;
+        
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch is not available. AIS data search features will be limited.");
+        }
+    }
     
     private static final String AIS_QUEUE = "ais.data.queue";
     private static final String AIS_EXCHANGE = "ais.exchange";
@@ -231,6 +257,11 @@ public class AisDataService {
      * Index AIS data in Elasticsearch for fast search
      */
     private void indexInElasticsearch(AisData aisData) {
+        if (aisDataElasticsearchRepository == null) {
+            // Elasticsearch not available, skip indexing
+            return;
+        }
+        
         try {
             AisDataDocument document = documentMapper.toDocument(aisData);
             aisDataElasticsearchRepository.save(document);
@@ -346,6 +377,10 @@ public class AisDataService {
      */
     @Transactional(readOnly = true)
     public List<AisDataDocument> searchAisDataByShipName(String shipName) {
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch not available. Cannot search by ship name.");
+            return Collections.emptyList();
+        }
         log.info("Searching AIS data by ship name: {}", shipName);
         return aisDataElasticsearchRepository.findByShipNameContaining(shipName);
     }
@@ -355,6 +390,10 @@ public class AisDataService {
      */
     @Transactional(readOnly = true)
     public List<AisDataDocument> getShipHistory(String mmsi) {
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch not available. Cannot get ship history.");
+            return Collections.emptyList();
+        }
         log.info("Getting AIS history for MMSI: {}", mmsi);
         return aisDataElasticsearchRepository.findByMmsiOrderByTimestampDesc(mmsi);
     }
@@ -367,6 +406,10 @@ public class AisDataService {
             Double minLat, Double maxLat, 
             Double minLng, Double maxLng, 
             LocalDateTime since) {
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch not available. Cannot search by area.");
+            return Collections.emptyList();
+        }
         log.info("Searching AIS data in area using Elasticsearch");
         return aisDataElasticsearchRepository.findByLatitudeBetweenAndLongitudeBetweenAndTimestampGreaterThanEqual(
                 minLat, maxLat, minLng, maxLng, since);
@@ -377,6 +420,10 @@ public class AisDataService {
      */
     @Transactional(readOnly = true)
     public List<AisDataDocument> getRecentAisData(int minutes) {
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch not available. Cannot get recent AIS data.");
+            return Collections.emptyList();
+        }
         LocalDateTime since = LocalDateTime.now().minusMinutes(minutes);
         log.info("Getting recent AIS data since {} minutes ago", minutes);
         return aisDataElasticsearchRepository.findByTimestampGreaterThanEqual(since);
@@ -387,6 +434,10 @@ public class AisDataService {
      */
     @Transactional(readOnly = true)
     public List<AisDataDocument> findAisDataByShipType(String shipType) {
+        if (aisDataElasticsearchRepository == null) {
+            log.warn("Elasticsearch not available. Cannot search by ship type.");
+            return Collections.emptyList();
+        }
         log.info("Searching AIS data by ship type: {}", shipType);
         return aisDataElasticsearchRepository.findByShipType(shipType);
     }

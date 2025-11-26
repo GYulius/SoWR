@@ -819,6 +819,52 @@
         </div>
     </div>
 
+    <!-- Verification Code Modal -->
+    <div class="modal fade" id="verificationCodeModal" tabindex="-1" aria-labelledby="verificationCodeModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="verificationCodeModalLabel">
+                        <i class="fas fa-shield-alt me-2"></i>Identity Verification Required
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div id="verificationCodeErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                    <div id="verificationCodeSuccessMessage" class="alert alert-success" style="display: none;"></div>
+                    
+                    <p class="mb-3">
+                        For security reasons, we need to verify your identity. A unique code has been sent to your registered email address. 
+                        Please check your inbox, retrieve the code, and enter it in the field below to complete the login process. 
+                        This additional step ensures your account remains secure. If you do not see the email in your inbox, please check your spam or junk folder.
+                    </p>
+                    
+                    <form id="verificationCodeForm">
+                        <input type="hidden" id="verificationUserEmail" value="">
+                        
+                        <div class="mb-3">
+                            <label for="verificationCodeInput" class="form-label">Authentication Code</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                <input type="text" class="form-control text-center" id="verificationCodeInput" 
+                                       placeholder="000000" maxlength="6" pattern="[0-9]{6}" 
+                                       style="font-size: 24px; letter-spacing: 8px; font-weight: bold;" required>
+                            </div>
+                            <small class="form-text text-muted">Enter the 6-digit code sent to your email</small>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check-circle me-2"></i>Verify
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resendCodeBtn" onclick="resendVerificationCode()">
+                                <i class="fas fa-redo me-2"></i>Resend Code
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="bg-dark text-light py-4">
@@ -848,7 +894,8 @@
     <!-- Make sure you put this AFTER Leaflet's CSS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-         crossorigin=""></script>
+         crossorigin=""
+         onerror="console.error('Failed to load Leaflet from CDN. Map features will be disabled.'); window.leafletFailed = true;"></script>
     
     <!-- Facebook SDK for JavaScript -->
     <script>
@@ -857,6 +904,7 @@
             if (d.getElementById(id)) {return;}
             js = d.createElement(s); js.id = id;
             js.src = "https://connect.facebook.net/en_US/sdk.js";
+            js.onerror = function() { console.warn('Facebook SDK failed to load'); };
             fjs.parentNode.insertBefore(js, fjs);
         }(document, 'script', 'facebook-jssdk'));
     </script>
@@ -866,14 +914,42 @@
          * Leaflet map initialization
          * @global {Object} L - Leaflet library loaded from CDN
          */
-        // Initialize map with worldwide view (minimal zoom)
-        let map = L.map('map').setView([0, 0], 2); // Worldwide view
+        // Wait for Leaflet to load before initializing map
+        let map = null;
         
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
+        function initializeMap() {
+            // Check if Leaflet loaded successfully
+            if (typeof L === 'undefined' || window.leafletFailed) {
+                console.error('Leaflet library not loaded. Map features will be disabled.');
+                document.getElementById('map').innerHTML = '<div class="alert alert-warning m-3">Map unavailable: CDN resources could not be loaded. Please check your internet connection.</div>';
+                return;
+            }
+            
+            try {
+                // Initialize map with worldwide view (minimal zoom)
+                map = L.map('map').setView([0, 0], 2); // Worldwide view
+                
+                // Add OpenStreetMap tiles
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19
+                }).addTo(map);
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                document.getElementById('map').innerHTML = '<div class="alert alert-warning m-3">Map unavailable: Error initializing map.</div>';
+            }
+        }
+        
+        // Initialize map when DOM is ready and Leaflet is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                // Wait a bit for Leaflet to load
+                setTimeout(initializeMap, 100);
+            });
+        } else {
+            // DOM already loaded, wait for Leaflet
+            setTimeout(initializeMap, 100);
+        }
         
         // Global variables for map markers
         let portMarker = null; // Selected port marker (highlighted)
@@ -1073,9 +1149,11 @@
             
             if (!portId || portId === '') {
                 // Reset map to worldwide view
-                map.flyTo([0, 0], 2, {
-                    duration: 1.0
-                });
+                if (map && typeof L !== 'undefined') {
+                    map.flyTo([0, 0], 2, {
+                        duration: 1.0
+                    });
+                }
                 document.getElementById('portInfo').style.display = 'none';
                 document.getElementById('portCardsContainer').innerHTML = 
                     '<div class="col-12 text-center"><p class="text-muted">Select a port to view details</p></div>';
@@ -1238,11 +1316,20 @@
         
         /**
          * Display all ports as markers on the map
+         * Uses a Set to prevent duplicate markers based on coordinates
          */
         function displayAllPortsMarkers() {
+            if (!map || typeof L === 'undefined') {
+                console.warn('Map not initialized, skipping marker display');
+                return;
+            }
+            
             // Clear existing port markers
             allPortMarkers.forEach(marker => map.removeLayer(marker));
             allPortMarkers = [];
+            
+            // Use Set to track added coordinates and prevent duplicates
+            const addedCoordinates = new Set();
             
             // Create a simple icon for port markers
             const portIcon = L.icon({
@@ -1258,11 +1345,21 @@
                     !isNaN(port.latitude) && !isNaN(port.longitude) &&
                     port.latitude !== 0 && port.longitude !== 0) {
                     
+                    // Create coordinate key to check for duplicates
+                    const coordKey = `${port.latitude.toFixed(4)},${port.longitude.toFixed(4)}`;
+                    
+                    // Skip if we've already added a marker at this exact location
+                    if (addedCoordinates.has(coordKey)) {
+                        console.debug('Skipping duplicate port marker at:', coordKey);
+                        return;
+                    }
+                    
                     const marker = L.marker([port.latitude, port.longitude], {icon: portIcon})
                         .addTo(map)
                         .bindPopup(`<b>${port.name || 'Unknown'}</b><br>${port.portCode || 'N/A'} - ${port.country || 'Unknown'}`);
                     
                     allPortMarkers.push(marker);
+                    addedCoordinates.add(coordKey);
                 }
             });
             
@@ -1275,6 +1372,10 @@
          * map.removeLayer is a Leaflet method
          */
         function clearMarkers() {
+            if (!map || typeof L === 'undefined') {
+                return;
+            }
+            
             if (portMarker) {
                 map.removeLayer(portMarker);
                 portMarker = null;
@@ -1534,10 +1635,25 @@
         document.getElementById('loginModalForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const email = document.getElementById('loginEmail').value;
+            const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
             const errorDiv = document.getElementById('loginErrorMessage');
             errorDiv.style.display = 'none';
+            
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email || !emailRegex.test(email)) {
+                errorDiv.textContent = 'Please enter a valid email address.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Validate password
+            if (!password || password.length === 0) {
+                errorDiv.textContent = 'Please enter your password.';
+                errorDiv.style.display = 'block';
+                return;
+            }
             
             try {
                 const basePath = getBasePath();
@@ -1552,31 +1668,40 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    // Store token in localStorage
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data));
                     
-                    // Set cookie manually as fallback
-                    document.cookie = `token=${data.token}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-                    document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-                    
-                    // Close modal
-                    bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
-                    
-                    // Handle redirect based on role
-                    if (data.role === 'ADMIN') {
-                        // Navigate to admin maintenance in the same window
-                        const currentPort = window.location.port;
-                        let adminUrl;
-                        if (currentPort === '63342' || currentPort === '') {
-                            adminUrl = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
-                        } else {
-                            adminUrl = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
-                        }
-                        window.location.href = adminUrl;
+                    // Check if verification code is required
+                    if (data.requiresVerification) {
+                        // Close login modal
+                        bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+                        // Show verification code modal
+                        showVerificationCodeModal(data.email);
                     } else {
-                        // Show user interface on current page
-                        showUserInterface(data);
+                        // Store token in localStorage
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data));
+                        
+                        // Set cookie manually as fallback
+                        document.cookie = `token=${data.token}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                        
+                        // Close modal
+                        bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+                        
+                        // Handle redirect based on role
+                        if (data.role === 'ADMIN') {
+                            // Navigate to admin maintenance in the same window
+                            const currentPort = window.location.port;
+                            let adminUrl;
+                            if (currentPort === '63342' || currentPort === '') {
+                                adminUrl = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                            } else {
+                                adminUrl = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                            }
+                            window.location.href = adminUrl;
+                        } else {
+                            // Show user interface on current page
+                            showUserInterface(data);
+                        }
                     }
                 } else {
                     const error = await response.text();
@@ -1593,18 +1718,58 @@
         document.getElementById('registerModalFormFields').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const registerData = {
-                firstName: document.getElementById('regModalFirstName').value,
-                lastName: document.getElementById('regModalLastName').value,
-                email: document.getElementById('regModalEmail').value,
-                password: document.getElementById('regModalPassword').value,
-                role: document.getElementById('regModalRole').value
-            };
+            const email = document.getElementById('regModalEmail').value.trim();
+            const password = document.getElementById('regModalPassword').value;
+            const firstName = document.getElementById('regModalFirstName').value.trim();
+            const lastName = document.getElementById('regModalLastName').value.trim();
+            const role = document.getElementById('regModalRole').value;
             
             const errorDiv = document.getElementById('registerModalErrorMessage');
             const successDiv = document.getElementById('registerModalSuccessMessage');
             errorDiv.style.display = 'none';
             successDiv.style.display = 'none';
+            
+            // Validate email format (comprehensive validation)
+            const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+            if (!email) {
+                errorDiv.textContent = 'Email address is required.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            if (!emailRegex.test(email)) {
+                errorDiv.textContent = 'Please enter a valid email address (e.g., yourname@example.com).';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Additional check for common email providers
+            const emailDomain = email.split('@')[1];
+            if (!emailDomain || emailDomain.length < 4 || !emailDomain.includes('.')) {
+                errorDiv.textContent = 'Please enter a valid email address with a proper domain (e.g., @gmail.com, @yahoo.com).';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Validate required fields
+            if (!firstName || !lastName || !password) {
+                errorDiv.textContent = 'Please fill in all required fields.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters long.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            const registerData = {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                password: password,
+                role: role
+            };
             
             try {
                 const basePath = getBasePath();
@@ -1619,16 +1784,39 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    successDiv.textContent = `User registered successfully! Role: ${data.role}. You can now login.`;
-                    successDiv.style.display = 'block';
                     
-                    // Auto-fill login form
-                    document.getElementById('loginEmail').value = registerData.email;
+                    // Close registration modal
+                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    if (loginModal) {
+                        loginModal.hide();
+                    }
                     
-                    // Hide register form after 2 seconds
-                    setTimeout(() => {
-                        hideRegisterModal();
-                    }, 2000);
+                    // If verification is required, show verification code modal
+                    if (data.requiresVerification && data.emailSent) {
+                        showVerificationCodeModal(data.email);
+                    } else if (data.emailSent) {
+                        successDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                <strong>Registration Successful!</strong><br>
+                                A verification code has been sent to <strong>${data.email}</strong>.<br>
+                                Please check your inbox (and spam folder) to complete your registration.
+                            </div>
+                        `;
+                        successDiv.style.display = 'block';
+                        // Auto-fill login form
+                        document.getElementById('loginEmail').value = registerData.email;
+                        setTimeout(() => {
+                            hideRegisterModal();
+                        }, 5000);
+                    } else {
+                        successDiv.innerHTML = `
+                            <div class="alert alert-warning">
+                                <strong>Registration Successful!</strong><br>
+                                However, email verification is not configured. Please contact support to verify your account.
+                            </div>
+                        `;
+                        successDiv.style.display = 'block';
+                    }
                 } else {
                     const error = await response.text();
                     errorDiv.textContent = error || 'Registration failed. Please try again.';
@@ -2415,6 +2603,153 @@
                     }
                 }
             }, 2000); // Wait 2 seconds for map to load
+        }
+        
+        // Verification Code Modal Functions
+        function showVerificationCodeModal(email) {
+            document.getElementById('verificationUserEmail').value = email;
+            document.getElementById('verificationCodeInput').value = '';
+            document.getElementById('verificationCodeErrorMessage').style.display = 'none';
+            document.getElementById('verificationCodeSuccessMessage').style.display = 'none';
+            
+            const modal = new bootstrap.Modal(document.getElementById('verificationCodeModal'));
+            modal.show();
+        }
+        
+        // Handle verification code form submission
+        document.getElementById('verificationCodeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('verificationUserEmail').value;
+            const code = document.getElementById('verificationCodeInput').value.trim();
+            const errorDiv = document.getElementById('verificationCodeErrorMessage');
+            const successDiv = document.getElementById('verificationCodeSuccessMessage');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+                errorDiv.textContent = 'Please enter a valid 6-digit verification code.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/verify-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, code })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Close verification modal
+                    bootstrap.Modal.getInstance(document.getElementById('verificationCodeModal')).hide();
+                    
+                    // If token is returned (login verification), store it and proceed
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify({
+                            token: data.token,
+                            email: data.email,
+                            userId: data.userId,
+                            role: data.role,
+                            firstName: data.firstName,
+                            lastName: data.lastName
+                        }));
+                        
+                        // Set cookies
+                        document.cookie = `token=${data.token}; path=/api/v1; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+                        
+                        // Handle redirect based on role
+                        if (data.role === 'ADMIN') {
+                            const currentPort = window.location.port;
+                            let adminUrl;
+                            if (currentPort === '63342' || currentPort === '') {
+                                adminUrl = `http://localhost:8080/api/v1/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                            } else {
+                                adminUrl = `${basePath}/admin/maintenance?token=${encodeURIComponent(data.token)}`;
+                            }
+                            window.location.href = adminUrl;
+                        } else {
+                            showUserInterface({
+                                email: data.email,
+                                userId: data.userId,
+                                role: data.role,
+                                firstName: data.firstName,
+                                lastName: data.lastName
+                            });
+                        }
+                    } else {
+                        // Registration verification - show success and allow login
+                        alert('Email verified successfully! You can now log in.');
+                        showLoginModal();
+                    }
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Invalid verification code. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Verification failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+        
+        // Resend verification code
+        async function resendVerificationCode() {
+            const email = document.getElementById('verificationUserEmail').value;
+            const errorDiv = document.getElementById('verificationCodeErrorMessage');
+            const successDiv = document.getElementById('verificationCodeSuccessMessage');
+            const resendBtn = document.getElementById('resendCodeBtn');
+            
+            if (!email) {
+                errorDiv.textContent = 'Email address not found. Please try again.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Disable button temporarily
+            resendBtn.disabled = true;
+            resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending...';
+            
+            try {
+                const basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/resend-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email })
+                });
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Verification code sent successfully! Please check your inbox.';
+                    successDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    
+                    // Clear code input
+                    document.getElementById('verificationCodeInput').value = '';
+                } else {
+                    const error = await response.text();
+                    errorDiv.textContent = error || 'Failed to resend code. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Failed to resend code. Please try again.';
+                errorDiv.style.display = 'block';
+            } finally {
+                // Re-enable button
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = '<i class="fas fa-redo me-2"></i>Resend Code';
+            }
         }
     </script>
     

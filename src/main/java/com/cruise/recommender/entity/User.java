@@ -69,6 +69,10 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive = true;
     
+    @Builder.Default
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+    
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

@@ -13,13 +13,14 @@ import com.cruise.recommender.repository.UserRepository;
 import com.cruise.recommender.repository.elasticsearch.AisDataDocument;
 import com.cruise.recommender.repository.elasticsearch.AisDataDocumentMapper;
 import com.cruise.recommender.repository.elasticsearch.AisDataElasticsearchRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,20 +28,43 @@ import java.util.Optional;
 /**
  * Service for persisting processed data to MySQL and Elasticsearch
  * Receives data from Knowledge Graph processing and stores it in both databases
+ * 
+ * Note: Elasticsearch is optional - service will work without it
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DataPersistenceService {
     
     private final AisDataRepository aisDataRepository;
-    private final AisDataElasticsearchRepository aisDataElasticsearchRepository;
     private final AisDataDocumentMapper documentMapper;
     private final PassengerInterestRepository passengerInterestRepository;
     private final PassengerRepository passengerRepository;
     private final UserRepository userRepository;
     private final PortRepository portRepository;
     private final KnowledgeGraphSparkService knowledgeGraphService;
+    
+    // Optional Elasticsearch dependency - will be null if Elasticsearch is disabled
+    private final AisDataElasticsearchRepository aisDataElasticsearchRepository;
+    
+    @Autowired
+    public DataPersistenceService(
+            AisDataRepository aisDataRepository,
+            AisDataDocumentMapper documentMapper,
+            PassengerInterestRepository passengerInterestRepository,
+            PassengerRepository passengerRepository,
+            UserRepository userRepository,
+            PortRepository portRepository,
+            KnowledgeGraphSparkService knowledgeGraphService,
+            @Autowired(required = false) AisDataElasticsearchRepository aisDataElasticsearchRepository) {
+        this.aisDataRepository = aisDataRepository;
+        this.documentMapper = documentMapper;
+        this.passengerInterestRepository = passengerInterestRepository;
+        this.passengerRepository = passengerRepository;
+        this.userRepository = userRepository;
+        this.portRepository = portRepository;
+        this.knowledgeGraphService = knowledgeGraphService;
+        this.aisDataElasticsearchRepository = aisDataElasticsearchRepository;
+    }
     
     /**
      * Process and persist AIS data from Knowledge Graph
@@ -88,9 +112,15 @@ public class DataPersistenceService {
                     // Save to MySQL
                     AisData savedAisData = aisDataRepository.save(aisData);
                     
-                    // Index in Elasticsearch
-                    AisDataDocument document = documentMapper.toDocument(savedAisData);
-                    aisDataElasticsearchRepository.save(document);
+                    // Index in Elasticsearch (if available)
+                    if (aisDataElasticsearchRepository != null) {
+                        try {
+                            AisDataDocument document = documentMapper.toDocument(savedAisData);
+                            aisDataElasticsearchRepository.save(document);
+                        } catch (Exception e) {
+                            log.warn("Failed to index AIS data in Elasticsearch: {}", e.getMessage());
+                        }
+                    }
                     
                     log.info("Persisted AIS data for MMSI: {}", mmsi);
                 }
@@ -272,9 +302,15 @@ public class DataPersistenceService {
                         
                         AisData saved = aisDataRepository.save(aisData);
                         
-                        // Index in Elasticsearch
-                        AisDataDocument document = documentMapper.toDocument(saved);
-                        aisDataElasticsearchRepository.save(document);
+                        // Index in Elasticsearch (if available)
+                        if (aisDataElasticsearchRepository != null) {
+                            try {
+                                AisDataDocument document = documentMapper.toDocument(saved);
+                                aisDataElasticsearchRepository.save(document);
+                            } catch (Exception e) {
+                                log.warn("Failed to index AIS data in Elasticsearch: {}", e.getMessage());
+                            }
+                        }
                         
                         log.debug("Synced AIS data for ship: {}", mmsi);
                     }
