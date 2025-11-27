@@ -107,7 +107,7 @@
         
         <!-- Statistics Summary Cards -->
         <div class="row mb-4">
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card stat-card text-center">
                     <div class="card-body">
                         <i class="fas fa-database fa-2x text-primary mb-2"></i>
@@ -117,7 +117,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card stat-card text-center">
                     <div class="card-body">
                         <i class="fas fa-exchange-alt fa-2x text-success mb-2"></i>
@@ -127,7 +127,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card stat-card text-center">
                     <div class="card-body">
                         <i class="fas fa-clock fa-2x text-info mb-2"></i>
@@ -137,13 +137,58 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="card stat-card text-center">
                     <div class="card-body">
                         <i class="fas fa-chart-line fa-2x text-warning mb-2"></i>
                         <h4 id="activeProducers">-</h4>
                         <p class="text-muted mb-1">Active Producers</p>
                         <small class="text-muted">Ports</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-tachometer-alt fa-2x text-danger mb-2"></i>
+                        <h4 id="apiTotalRequests">-</h4>
+                        <p class="text-muted mb-1">API Requests</p>
+                        <small class="text-muted" id="apiSuccessRate">-</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="card stat-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-server fa-2x text-secondary mb-2"></i>
+                        <h4 id="cpuUsage">-</h4>
+                        <p class="text-muted mb-1">CPU Usage</p>
+                        <small class="text-muted" id="memoryUsage">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- External Monitoring Links -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-external-link-alt me-2"></i>External Monitoring Dashboards</h5>
+                        <div class="btn-group" role="group">
+                            <a href="http://localhost:5601" target="_blank" class="btn btn-outline-primary">
+                                <i class="fas fa-chart-bar me-2"></i>Kibana
+                            </a>
+                            <a href="http://localhost:3001" target="_blank" class="btn btn-outline-info">
+                                <i class="fas fa-chart-line me-2"></i>Grafana
+                            </a>
+                            <a href="http://localhost:9090" target="_blank" class="btn btn-outline-success">
+                                <i class="fas fa-database me-2"></i>Prometheus
+                            </a>
+                            <a href="http://localhost:15672" target="_blank" class="btn btn-outline-warning">
+                                <i class="fas fa-exchange-alt me-2"></i>RabbitMQ
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -169,6 +214,11 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="restaurants-tab" data-bs-toggle="tab" data-bs-target="#restaurants" type="button">
                     <i class="fas fa-store me-2"></i>Restaurants
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="system-performance-tab" data-bs-toggle="tab" data-bs-target="#system-performance" type="button">
+                    <i class="fas fa-tachometer-alt me-2"></i>System Performance
                 </button>
             </li>
         </ul>
@@ -372,6 +422,123 @@
                                     <tr><td colspan="6" class="text-center">Loading...</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Performance Tab -->
+            <div class="tab-pane fade" id="system-performance" role="tabpanel">
+                <div class="row mb-4">
+                    <!-- API Performance Section -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-tachometer-alt me-2"></i>API Performance</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Total Requests</small>
+                                        <h4 id="apiPerfTotalRequests">-</h4>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Success Rate</small>
+                                        <h4 id="apiPerfSuccessRate">-</h4>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Avg Response Time</small>
+                                        <h5 id="apiPerfAvgTime">-</h5>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">P95 Response Time</small>
+                                        <h5 id="apiPerfP95Time">-</h5>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <small class="text-muted">Top Endpoints</small>
+                                    <div id="apiPerfEndpoints" class="mt-2">
+                                        <small class="text-muted">Loading...</small>
+                                    </div>
+                                </div>
+                                <div>
+                                    <small class="text-muted">Error Types</small>
+                                    <div id="apiPerfErrors" class="mt-2">
+                                        <small class="text-muted">Loading...</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Resource Utilization Section -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-server me-2"></i>Resource Utilization</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">CPU Usage</small>
+                                        <h4 id="resourceCpu">-</h4>
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar" id="resourceCpuBar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Memory Usage</small>
+                                        <h4 id="resourceMemory">-</h4>
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar bg-info" id="resourceMemoryBar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Heap Usage</small>
+                                        <h5 id="resourceHeap">-</h5>
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar bg-warning" id="resourceHeapBar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Disk Usage</small>
+                                        <h5 id="resourceDisk">-</h5>
+                                        <div class="progress" style="height: 8px;">
+                                            <div class="progress-bar bg-danger" id="resourceDiskBar" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <small class="text-muted">Threads</small>
+                                    <h5 id="resourceThreads">-</h5>
+                                </div>
+                                <div>
+                                    <small class="text-muted">Heap Memory</small>
+                                    <h6 id="resourceHeapMemory">-</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Kibana Dashboard Link -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5><i class="fas fa-chart-bar me-2"></i>Advanced Analytics</h5>
+                                <p class="text-muted">View detailed system performance metrics and visualizations in Kibana</p>
+                                <a href="http://localhost:5601" target="_blank" class="btn btn-primary">
+                                    <i class="fas fa-external-link-alt me-2"></i>Open Kibana Dashboard
+                                </a>
+                                <small class="d-block mt-2 text-muted">
+                                    Make sure Elasticsearch and Kibana are running: <code>docker-compose up -d elasticsearch kibana</code>
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1391,6 +1558,11 @@
             if (restaurantsTab) {
                 restaurantsTab.addEventListener('shown.bs.tab', loadRestaurants);
             }
+            
+            const systemPerfTab = document.getElementById('system-performance-tab');
+            if (systemPerfTab) {
+                systemPerfTab.addEventListener('shown.bs.tab', loadSystemPerformance);
+            }
         }
         
         // Load statistics summary
@@ -1404,6 +1576,8 @@
                     const stats = await response.json();
                     const sparql = stats.sparql || {};
                     const messages = stats.messages || {};
+                    const apiPerformance = stats.apiPerformance || {};
+                    const resourceUtilization = stats.resourceUtilization || {};
                     
                     // Update SPARQL stats
                     document.getElementById('sparqlTotalQueries').textContent = 
@@ -1427,9 +1601,136 @@
                     // Update active producers
                     document.getElementById('activeProducers').textContent = 
                         formatNumber((messages.producers || []).length);
+                    
+                    // Update API performance summary card
+                    if (apiPerformance.enabled) {
+                        document.getElementById('apiTotalRequests').textContent = 
+                            formatNumber(apiPerformance.totalRequests || 0);
+                        document.getElementById('apiSuccessRate').textContent = 
+                            `${(apiPerformance.successRate || 0).toFixed(1)}% success`;
+                    } else {
+                        document.getElementById('apiTotalRequests').textContent = '-';
+                        document.getElementById('apiSuccessRate').textContent = 'ES disabled';
+                    }
+                    
+                    // Update resource utilization summary card
+                    if (resourceUtilization.enabled && resourceUtilization.latest) {
+                        const latest = resourceUtilization.latest;
+                        const cpu = latest.cpuUsagePercent || 0;
+                        const memory = latest.memoryUsagePercent || 0;
+                        document.getElementById('cpuUsage').textContent = `${cpu.toFixed(1)}%`;
+                        document.getElementById('memoryUsage').textContent = `${memory.toFixed(1)}% memory`;
+                    } else {
+                        document.getElementById('cpuUsage').textContent = '-';
+                        document.getElementById('memoryUsage').textContent = 'ES disabled';
+                    }
                 }
             } catch (error) {
                 console.error('Error loading stats summary:', error);
+            }
+        }
+        
+        // Load system performance details
+        async function loadSystemPerformance() {
+            try {
+                const [apiPerfResponse, resourceResponse] = await Promise.all([
+                    fetch(`${getBasePath()}/admin/stats/api-performance?hours=24`, {
+                        headers: getAuthHeaders()
+                    }),
+                    fetch(`${getBasePath()}/admin/stats/resource-utilization?hours=24`, {
+                        headers: getAuthHeaders()
+                    })
+                ]);
+                
+                // Update API Performance
+                if (apiPerfResponse.ok) {
+                    const apiPerf = await apiPerfResponse.json();
+                    if (apiPerf.enabled && !apiPerf.error) {
+                        document.getElementById('apiPerfTotalRequests').textContent = 
+                            formatNumber(apiPerf.totalRequests || 0);
+                        document.getElementById('apiPerfSuccessRate').textContent = 
+                            `${(apiPerf.successRate || 0).toFixed(1)}%`;
+                        document.getElementById('apiPerfAvgTime').textContent = 
+                            `${formatNumber(apiPerf.avgResponseTimeMs || 0, 0)} ms`;
+                        document.getElementById('apiPerfP95Time').textContent = 
+                            `${formatNumber(apiPerf.p95ResponseTimeMs || 0, 0)} ms`;
+                        
+                        // Top endpoints
+                        const endpointsDiv = document.getElementById('apiPerfEndpoints');
+                        if (apiPerf.endpointPerformance && apiPerf.endpointPerformance.length > 0) {
+                            endpointsDiv.innerHTML = apiPerf.endpointPerformance.slice(0, 5).map(ep => 
+                                `<div class="d-flex justify-content-between mb-1">
+                                    <small>${ep.endpoint}</small>
+                                    <small class="text-muted">${formatNumber(ep.avgTime, 0)}ms</small>
+                                </div>`
+                            ).join('');
+                        } else {
+                            endpointsDiv.innerHTML = '<small class="text-muted">No data</small>';
+                        }
+                        
+                        // Error types
+                        const errorsDiv = document.getElementById('apiPerfErrors');
+                        if (apiPerf.errorTypes && apiPerf.errorTypes.length > 0) {
+                            errorsDiv.innerHTML = apiPerf.errorTypes.slice(0, 5).map(err => 
+                                `<div class="d-flex justify-content-between mb-1">
+                                    <small class="text-danger">${err.type || 'Unknown'}</small>
+                                    <small class="text-muted">${err.count}</small>
+                                </div>`
+                            ).join('');
+                        } else {
+                            errorsDiv.innerHTML = '<small class="text-success">No errors</small>';
+                        }
+                    } else {
+                        document.getElementById('apiPerfTotalRequests').textContent = '-';
+                        document.getElementById('apiPerfEndpoints').innerHTML = 
+                            '<small class="text-muted">' + (apiPerf.error || 'Elasticsearch not enabled') + '</small>';
+                    }
+                }
+                
+                // Update Resource Utilization
+                if (resourceResponse.ok) {
+                    const resource = await resourceResponse.json();
+                    if (resource.enabled && !resource.error && resource.latest) {
+                        const latest = resource.latest;
+                        const cpu = latest.cpuUsagePercent || 0;
+                        const memory = latest.memoryUsagePercent || 0;
+                        const heap = latest.heapUsagePercent || 0;
+                        const disk = latest.diskUsagePercent || 0;
+                        
+                        document.getElementById('resourceCpu').textContent = `${cpu.toFixed(1)}%`;
+                        document.getElementById('resourceCpuBar').style.width = `${cpu}%`;
+                        document.getElementById('resourceCpuBar').className = 
+                            `progress-bar ${cpu > 80 ? 'bg-danger' : cpu > 60 ? 'bg-warning' : 'bg-success'}`;
+                        
+                        document.getElementById('resourceMemory').textContent = `${memory.toFixed(1)}%`;
+                        document.getElementById('resourceMemoryBar').style.width = `${memory}%`;
+                        document.getElementById('resourceMemoryBar').className = 
+                            `progress-bar bg-info ${memory > 80 ? 'bg-danger' : memory > 60 ? 'bg-warning' : 'bg-info'}`;
+                        
+                        document.getElementById('resourceHeap').textContent = `${heap.toFixed(1)}%`;
+                        document.getElementById('resourceHeapBar').style.width = `${heap}%`;
+                        document.getElementById('resourceHeapBar').className = 
+                            `progress-bar bg-warning ${heap > 80 ? 'bg-danger' : heap > 60 ? 'bg-warning' : 'bg-success'}`;
+                        
+                        document.getElementById('resourceDisk').textContent = `${disk.toFixed(1)}%`;
+                        document.getElementById('resourceDiskBar').style.width = `${disk}%`;
+                        document.getElementById('resourceDiskBar').className = 
+                            `progress-bar bg-danger ${disk > 80 ? 'bg-danger' : disk > 60 ? 'bg-warning' : 'bg-success'}`;
+                        
+                        document.getElementById('resourceThreads').textContent = 
+                            formatNumber(latest.threadCount || 0);
+                        
+                        const heapUsedMB = (latest.heapUsedBytes || 0) / (1024 * 1024);
+                        const heapMaxMB = (latest.heapMaxBytes || 0) / (1024 * 1024);
+                        document.getElementById('resourceHeapMemory').textContent = 
+                            `${formatNumber(heapUsedMB, 0)} MB / ${formatNumber(heapMaxMB, 0)} MB`;
+                    } else {
+                        document.getElementById('resourceCpu').textContent = '-';
+                        document.getElementById('resourceMemory').textContent = '-';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading system performance:', error);
             }
         }
         
@@ -1452,6 +1753,18 @@
             loadStatsSummary();
             // Refresh stats every 30 seconds
             setInterval(loadStatsSummary, 30000);
+            // Load system performance if tab is active
+            const systemPerfTab = document.getElementById('system-performance-tab');
+            if (systemPerfTab && systemPerfTab.classList.contains('active')) {
+                loadSystemPerformance();
+            }
+            // Refresh system performance every 30 seconds if tab is visible
+            setInterval(() => {
+                const systemPerfPane = document.getElementById('system-performance');
+                if (systemPerfPane && systemPerfPane.classList.contains('active')) {
+                    loadSystemPerformance();
+                }
+            }, 30000);
         });
         
         async function logout() {

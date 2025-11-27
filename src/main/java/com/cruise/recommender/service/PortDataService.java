@@ -40,6 +40,13 @@ public class PortDataService {
     
     @PostConstruct
     public void loadPorts() {
+        // Disabled: Ports are now loaded from database via PortRepository
+        // This service is kept for backward compatibility but JSON loading is disabled
+        log.info("PortDataService: JSON loading disabled. Ports are loaded from database.");
+        allPorts = new ArrayList<>();
+        
+        // Uncomment below if you need to load from JSON file (not recommended with database persistence)
+        /*
         try {
             // Try classpath first, then file system
             ClassPathResource resource = new ClassPathResource("data/all_RCI_ports.json");
@@ -78,6 +85,7 @@ public class PortDataService {
             log.warn("Port data will not be available. Some features may be limited.");
             allPorts = new ArrayList<>();
         }
+        */
     }
     
     /**

@@ -96,8 +96,30 @@ public class AdminController {
     public ResponseEntity<Port> updatePort(@PathVariable Long id, @RequestBody Port port) {
         return portRepository.findById(id)
                 .map(existing -> {
-                    port.setId(id);
-                    Port updated = portRepository.save(port);
+                    // Merge incoming fields with existing port (only update fields that are provided)
+                    if (port.getPortCode() != null) {
+                        existing.setPortCode(port.getPortCode());
+                    }
+                    if (port.getName() != null) {
+                        existing.setName(port.getName());
+                    }
+                    if (port.getCountry() != null) {
+                        existing.setCountry(port.getCountry());
+                    }
+                    if (port.getCity() != null) {
+                        existing.setCity(port.getCity());
+                    }
+                    if (port.getLatitude() != null) {
+                        existing.setLatitude(port.getLatitude());
+                    }
+                    if (port.getLongitude() != null) {
+                        existing.setLongitude(port.getLongitude());
+                    }
+                    if (port.getBerthsCapacity() != null) {
+                        existing.setBerthsCapacity(port.getBerthsCapacity());
+                    }
+                    // Preserve all other fields (geo, region, facilities, amenities, etc.) from existing port
+                    Port updated = portRepository.save(existing);
                     return ResponseEntity.ok(updated);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -168,8 +190,39 @@ public class AdminController {
     public ResponseEntity<CruiseShip> updateShip(@PathVariable Long id, @RequestBody CruiseShip ship) {
         return cruiseShipRepository.findById(id)
                 .map(existing -> {
-                    ship.setId(id);
-                    CruiseShip updated = cruiseShipRepository.save(ship);
+                    // Merge incoming fields with existing ship (only update fields that are provided)
+                    if (ship.getName() != null) {
+                        existing.setName(ship.getName());
+                    }
+                    if (ship.getCruiseLine() != null) {
+                        existing.setCruiseLine(ship.getCruiseLine());
+                    }
+                    if (ship.getCapacity() != null) {
+                        existing.setCapacity(ship.getCapacity());
+                    }
+                    if (ship.getMmsi() != null) {
+                        existing.setMmsi(ship.getMmsi());
+                    }
+                    if (ship.getImo() != null) {
+                        existing.setImo(ship.getImo());
+                    }
+                    if (ship.getCallSign() != null) {
+                        existing.setCallSign(ship.getCallSign());
+                    }
+                    if (ship.getLengthMeters() != null) {
+                        existing.setLengthMeters(ship.getLengthMeters());
+                    }
+                    if (ship.getWidthMeters() != null) {
+                        existing.setWidthMeters(ship.getWidthMeters());
+                    }
+                    if (ship.getYearBuilt() != null) {
+                        existing.setYearBuilt(ship.getYearBuilt());
+                    }
+                    if (ship.getAisEnabled() != null) {
+                        existing.setAisEnabled(ship.getAisEnabled());
+                    }
+                    // Preserve all other fields (amenities, AIS tracking data, etc.) from existing ship
+                    CruiseShip updated = cruiseShipRepository.save(existing);
                     return ResponseEntity.ok(updated);
                 })
                 .orElse(ResponseEntity.notFound().build());

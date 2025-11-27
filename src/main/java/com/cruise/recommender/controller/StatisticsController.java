@@ -1,6 +1,7 @@
 package com.cruise.recommender.controller;
 
 import com.cruise.recommender.service.StatisticsService;
+import com.cruise.recommender.service.SystemPerformanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class StatisticsController {
     
     private final StatisticsService statisticsService;
+    private final SystemPerformanceService systemPerformanceService;
     
     /**
      * Get SPARQL query statistics
@@ -74,12 +76,34 @@ public class StatisticsController {
         Map<String, Object> dashboard = new java.util.HashMap<>();
         dashboard.put("sparql", statisticsService.getSparqlStats(since));
         dashboard.put("messages", statisticsService.getMessageStats(since));
+        dashboard.put("apiPerformance", systemPerformanceService.getApiPerformanceStats(hours));
+        dashboard.put("resourceUtilization", systemPerformanceService.getResourceUtilizationStats(hours));
         dashboard.put("timeRange", Map.of(
             "since", since.toString(),
             "hours", hours
         ));
         
         return ResponseEntity.ok(dashboard);
+    }
+    
+    /**
+     * Get API performance statistics
+     * GET /admin/stats/api-performance?hours=24
+     */
+    @GetMapping("/api-performance")
+    public ResponseEntity<Map<String, Object>> getApiPerformanceStats(
+            @RequestParam(defaultValue = "24") int hours) {
+        return ResponseEntity.ok(systemPerformanceService.getApiPerformanceStats(hours));
+    }
+    
+    /**
+     * Get resource utilization statistics
+     * GET /admin/stats/resource-utilization?hours=24
+     */
+    @GetMapping("/resource-utilization")
+    public ResponseEntity<Map<String, Object>> getResourceUtilizationStats(
+            @RequestParam(defaultValue = "24") int hours) {
+        return ResponseEntity.ok(systemPerformanceService.getResourceUtilizationStats(hours));
     }
 }
 

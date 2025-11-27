@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.core.Ordered;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,14 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+public class JwtAuthenticationFilter extends OncePerRequestFilter implements Ordered {
+    
+    private static final int FILTER_ORDER = 2; // Order 2: After ApiPerformanceFilter (Order 1)
+    
+    @Override
+    public int getOrder() {
+        return FILTER_ORDER;
+    }
     
     private final JwtTokenProvider tokenProvider;
     private final CustomUserDetailsService customUserDetailsService;

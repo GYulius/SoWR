@@ -37,38 +37,40 @@ public class WebController {
     public String index(Model model) {
         log.info("Serving main application page");
         
-        // Load ALL ports from JSON for map display (filter out ports without coordinates)
-        List<PortDataService.PortData> allPorts = portDataService.getAllPorts();
-        log.info("Total ports loaded from JSON: {}", allPorts.size());
+        // Load ports from database (ports are now persisted in database)
+        List<Port> ports = portRepository.findAll();
+        log.info("Total ports loaded from database: {}", ports.size());
         
-        List<PortDataService.PortData> portsWithCoordinates = allPorts.stream()
+        // Filter ports with valid coordinates for map display
+        List<Port> portsWithCoordinates = ports.stream()
             .filter(p -> {
-                // Check if port has coordinates (either in JSON or can be parsed)
-                if (p.getLatitude() != null && !p.getLatitude().isEmpty() && 
-                    p.getLongitude() != null && !p.getLongitude().isEmpty()) {
-                    double lat = p.getLatitudeDecimal();
-                    double lng = p.getLongitudeDecimal();
-                    // Filter out invalid coordinates (0,0) - but allow if one is 0 and other is not
-                    // Also filter out obviously invalid coordinates (outside valid ranges)
-                    boolean validLat = lat >= -90 && lat <= 90 && (lat != 0.0 || lng != 0.0);
-                    boolean validLng = lng >= -180 && lng <= 180 && (lat != 0.0 || lng != 0.0);
-                    return validLat && validLng;
+                // Check if port has valid coordinates
+                if (p.getLatitude() != null && p.getLongitude() != null) {
+                    try {
+                        double lat = p.getLatitude();
+                        double lng = p.getLongitude();
+                        // Filter out invalid coordinates (0,0) and out of range
+                        boolean validLat = lat >= -90 && lat <= 90 && (lat != 0.0 || lng != 0.0);
+                        boolean validLng = lng >= -180 && lng <= 180 && (lat != 0.0 || lng != 0.0);
+                        return validLat && validLng;
+                    } catch (Exception e) {
+                        log.debug("Invalid coordinates for port {}: {}", p.getId(), e.getMessage());
+                        return false;
+                    }
                 }
                 return false;
             })
             .collect(java.util.stream.Collectors.toList());
         
         log.info("Found {} ports with valid coordinates out of {} total ports", 
-                portsWithCoordinates.size(), allPorts.size());
+                portsWithCoordinates.size(), ports.size());
         
         if (portsWithCoordinates.isEmpty()) {
-            log.warn("No ports with valid coordinates found! Check JSON file and coordinate parsing.");
+            log.warn("No ports with valid coordinates found! Check database port data.");
         }
         
+        // Pass ports to template (both for map and cards)
         model.addAttribute("featuredPorts", portsWithCoordinates);
-        
-        // Also load ports from database for card display
-        List<Port> ports = portRepository.findAll();
         model.addAttribute("ports", ports);
         
         return "index";

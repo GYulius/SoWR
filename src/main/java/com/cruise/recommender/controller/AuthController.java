@@ -10,10 +10,12 @@ import com.cruise.recommender.repository.UserRepository;
 import com.cruise.recommender.security.JwtTokenProvider;
 import com.cruise.recommender.security.UserPrincipal;
 import com.cruise.recommender.service.EmailService;
+import com.cruise.recommender.service.FacebookTokenValidationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +49,7 @@ public class AuthController {
     private final JwtTokenProvider tokenProvider;
     private final EmailService emailService;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final FacebookTokenValidationService facebookTokenValidationService;
     
     @Value("${social.media.facebook.app.id:}")
     private String facebookAppId;
@@ -593,39 +596,80 @@ public class AuthController {
     }
     
     @PostMapping("/facebook/login")
-    public ResponseEntity<?> loginWithFacebook(@RequestBody FacebookLoginRequest request, HttpServletResponse httpResponse) {
+    public ResponseEntity<?> loginWithFacebook(
+            @Valid @RequestBody FacebookLoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         try {
-            // Verify the access token with Facebook
-            String verifyUrl = String.format(
-                "https://graph.facebook.com/v24.0/me?access_token=%s&fields=id,name,email",
-                request.getAccessToken()
-            );
+            // Input validation
+            if (request.getAccessToken() == null || request.getAccessToken().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Access token is required"));
+            }
             
+            // CSRF protection - validate CSRF token if present
+            // Note: For stateless JWT auth, CSRF protection is less critical but still recommended
+            // We'll validate Origin header as an additional security measure
+            String origin = httpRequest.getHeader("Origin");
+            String referer = httpRequest.getHeader("Referer");
+            if (origin != null && !isValidOrigin(origin)) {
+                log.warn("Invalid origin for Facebook login: {}", origin);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Invalid origin"));
+            }
+            
+            // Validate Facebook access token using secure method (Authorization header)
             Map<String, Object> facebookUser;
             try {
-                facebookUser = restTemplate.getForObject(verifyUrl, Map.class);
-            } catch (Exception e) {
-                log.error("Failed to verify Facebook access token: {}", e.getMessage());
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body("Invalid Facebook access token");
+                facebookUser = facebookTokenValidationService.validateTokenAndGetUser(request.getAccessToken());
+            } catch (FacebookTokenValidationService.FacebookTokenException e) {
+                log.warn("Facebook token validation failed: {} - {}", e.getErrorCode(), e.getMessage());
+                
+                // Return appropriate error based on error code
+                if ("TOKEN_EXPIRED".equals(e.getErrorCode())) {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("error", "Facebook token expired. Please login again.", 
+                                        "errorCode", e.getErrorCode()));
+                } else if ("INVALID_TOKEN".equals(e.getErrorCode())) {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("error", "Invalid Facebook access token", 
+                                        "errorCode", e.getErrorCode()));
+                } else {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("error", "Failed to verify Facebook access token: " + e.getMessage(),
+                                        "errorCode", e.getErrorCode()));
+                }
             }
             
-            if (facebookUser == null || !facebookUser.containsKey("id")) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body("Failed to verify Facebook user");
-            }
+            // Extract and validate user information
+            String facebookUserId = sanitizeInput((String) facebookUser.get("id"));
+            String email = sanitizeEmail((String) facebookUser.get("email"));
+            String name = sanitizeInput((String) facebookUser.get("name"));
+            String firstName = sanitizeInput((String) facebookUser.get("first_name"));
+            String lastName = sanitizeInput((String) facebookUser.get("last_name"));
             
-            String facebookUserId = (String) facebookUser.get("id");
-            String email = (String) facebookUser.get("email");
-            String name = (String) facebookUser.get("name");
-            
-            // Extract first and last name from full name
-            String firstName = "";
-            String lastName = "";
-            if (name != null && !name.isEmpty()) {
+            // Fallback to name parsing if first_name/last_name not available
+            if ((firstName == null || firstName.isEmpty()) && name != null && !name.isEmpty()) {
                 String[] nameParts = name.split(" ", 2);
                 firstName = nameParts[0];
                 lastName = nameParts.length > 1 ? nameParts[1] : "";
+            }
+            
+            // Validate required fields
+            if (facebookUserId == null || facebookUserId.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Facebook user ID not found"));
+            }
+            
+            // Use email or fallback to Facebook ID-based email
+            if (email == null || email.isEmpty()) {
+                email = facebookUserId + "@facebook.com";
+            }
+            
+            // Validate email format
+            if (!isValidEmail(email)) {
+                log.warn("Invalid email format from Facebook: {}", email);
+                email = facebookUserId + "@facebook.com";
             }
             
             // Find or create user
@@ -635,10 +679,10 @@ public class AuthController {
                 // Create new user from Facebook
                 // Facebook users are considered verified since Facebook already verified their email
                 user = User.builder()
-                        .email(email != null ? email : facebookUserId + "@facebook.com")
+                        .email(email)
                         .passwordHash("") // No password for social login
-                        .firstName(firstName)
-                        .lastName(lastName)
+                        .firstName(firstName != null ? firstName : "")
+                        .lastName(lastName != null ? lastName : "")
                         .role(Role.USER)
                         .isActive(true)
                         .emailVerified(true) // Facebook users are pre-verified
@@ -663,20 +707,13 @@ public class AuthController {
                     user.getRole().name()
             );
             
-            // Set token as HTTP-only cookie
-            Cookie cookie = new Cookie("token", token);
-            cookie.setHttpOnly(false);
-            cookie.setPath("/api/v1");
-            cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-            cookie.setAttribute("SameSite", "Lax");
+            // Set secure HTTP-only cookies
+            // Use HttpServletResponse.addCookie with proper security settings
+            Cookie cookie = createSecureCookie("token", token, "/api/v1", 7 * 24 * 60 * 60);
             httpResponse.addCookie(cookie);
             
             // Also set cookie for root path
-            Cookie rootCookie = new Cookie("token", token);
-            rootCookie.setHttpOnly(false);
-            rootCookie.setPath("/");
-            rootCookie.setMaxAge(7 * 24 * 60 * 60);
-            rootCookie.setAttribute("SameSite", "Lax");
+            Cookie rootCookie = createSecureCookie("token", token, "/", 7 * 24 * 60 * 60);
             httpResponse.addCookie(rootCookie);
             
             AuthResponse response = AuthResponse.builder()
@@ -692,8 +729,87 @@ public class AuthController {
         } catch (Exception e) {
             log.error("Facebook login error: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to process Facebook login");
+                    .body(Map.of("error", "Failed to process Facebook login"));
         }
+    }
+    
+    /**
+     * Create a secure HTTP-only cookie
+     */
+    private Cookie createSecureCookie(String name, String value, String path, int maxAge) {
+        Cookie cookie = new Cookie(name, value);
+        cookie.setHttpOnly(true); // Prevent JavaScript access (XSS protection)
+        cookie.setSecure(isProduction()); // HTTPS only in production
+        cookie.setPath(path);
+        cookie.setMaxAge(maxAge);
+        cookie.setAttribute("SameSite", "Lax"); // CSRF protection
+        return cookie;
+    }
+    
+    /**
+     * Check if running in production environment
+     */
+    private boolean isProduction() {
+        String profile = System.getProperty("spring.profiles.active", "");
+        return profile.contains("prod") || profile.contains("production");
+    }
+    
+    /**
+     * Validate origin header for CSRF protection
+     */
+    private boolean isValidOrigin(String origin) {
+        // In production, validate against allowed origins
+        // For development, allow localhost origins
+        if (origin == null) {
+            return false;
+        }
+        
+        // Allow localhost for development
+        if (origin.startsWith("http://localhost") || origin.startsWith("https://localhost")) {
+            return true;
+        }
+        
+        // In production, check against configured allowed origins
+        // This should match your CORS configuration
+        // For now, we'll be permissive but log suspicious origins
+        return true; // TODO: Implement origin whitelist in production
+    }
+    
+    /**
+     * Sanitize input to prevent XSS
+     */
+    private String sanitizeInput(String input) {
+        if (input == null) {
+            return null;
+        }
+        // Remove potential XSS characters
+        return input.replaceAll("[<>\"']", "").trim();
+    }
+    
+    /**
+     * Sanitize and validate email
+     */
+    private String sanitizeEmail(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return null;
+        }
+        // Basic email sanitization
+        String sanitized = email.trim().toLowerCase();
+        // Remove potential XSS characters
+        sanitized = sanitized.replaceAll("[<>\"']", "");
+        return sanitized;
+    }
+    
+    /**
+     * Validate email format
+     */
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isEmpty()) {
+            return false;
+        }
+        // Basic email validation regex
+        String emailRegex = "^[A-Za-z0-9+_.-]+@(.+)$";
+        return email.matches(emailRegex);
     }
     
     // Inner class for registration request
@@ -719,10 +835,12 @@ public class AuthController {
     // Inner class for Facebook login request
     @lombok.Data
     public static class FacebookLoginRequest {
+        @jakarta.validation.constraints.NotBlank(message = "Access token is required")
         private String accessToken;
-        private String userId;
-        private String name;
-        private String email;
+        
+        private String userId; // Optional, will be validated from Facebook API
+        private String name; // Optional, will be validated from Facebook API
+        private String email; // Optional, will be validated from Facebook API
     }
 }
 

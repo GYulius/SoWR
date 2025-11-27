@@ -1,5 +1,6 @@
 package com.cruise.recommender.config;
 
+import com.cruise.recommender.config.ApiPerformanceFilter;
 import com.cruise.recommender.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +32,7 @@ import java.util.Arrays;
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiPerformanceFilter apiPerformanceFilter;
     
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -118,6 +120,10 @@ public class SecurityConfig {
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )
+            // Add filters in order: ApiPerformanceFilter (1) -> JwtAuthenticationFilter (2) -> UsernamePasswordAuthenticationFilter
+            // Both filters are added before UsernamePasswordAuthenticationFilter
+            // ApiPerformanceFilter is added first, then JwtAuthenticationFilter
+            .addFilterBefore(apiPerformanceFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
