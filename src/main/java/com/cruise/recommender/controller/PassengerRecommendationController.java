@@ -404,24 +404,40 @@ public class PassengerRecommendationController {
                 sparqlResults.size(), passengerId, port.getPortCode());
         
         // Convert results to response format
-        List<Map<String, String>> features = sparqlResults.stream()
+        // The SPARQL query returns: ?property (category) and ?feature (feature text)
+        List<Map<String, Object>> features = sparqlResults.stream()
                 .map(solution -> {
-                    Map<String, String> feature = new HashMap<>();
-                    if (solution.get("concept") != null) {
-                        feature.put("concept", solution.get("concept").toString());
-                        // Extract category from concept URI
-                        String conceptUri = solution.get("concept").toString();
-                        if (conceptUri.contains("/concept/")) {
-                            String[] parts = conceptUri.split("/concept/");
-                            if (parts.length > 1) {
-                                String category = parts[1].split("/")[0];
-                                feature.put("category", category);
-                            }
+                    Map<String, Object> feature = new HashMap<>();
+                    
+                    // Get feature text (the actual feature description)
+                    if (solution.get("feature") != null) {
+                        String featureText = solution.get("feature").toString();
+                        feature.put("feature", featureText);
+                        feature.put("label", featureText); // Keep for backward compatibility
+                    }
+                    
+                    // Get property/category (e.g., "activity", "excursion", "touristAttraction")
+                    if (solution.get("property") != null) {
+                        String property = solution.get("property").toString();
+                        feature.put("property", property);
+                        feature.put("category", property); // Keep for backward compatibility
+                        
+                        // Map property to user-friendly category name
+                        String categoryDisplay = mapPropertyToCategoryDisplay(property);
+                        feature.put("categoryDisplay", categoryDisplay);
+                    }
+                    
+                    // Find which user interest keywords matched this feature
+                    if (solution.get("feature") != null) {
+                        String featureText = solution.get("feature").toString().toLowerCase();
+                        List<String> matchedKeywords = interestKeywords.stream()
+                                .filter(keyword -> featureText.contains(keyword.toLowerCase()))
+                                .collect(Collectors.toList());
+                        if (!matchedKeywords.isEmpty()) {
+                            feature.put("matchedInterests", matchedKeywords);
                         }
                     }
-                    if (solution.get("label") != null) {
-                        feature.put("label", solution.get("label").toString());
-                    }
+                    
                     return feature;
                 })
                 .collect(Collectors.toList());
@@ -445,6 +461,28 @@ public class PassengerRecommendationController {
         response.put("debug", debugInfo);
         
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Map SPARQL property name to user-friendly category display name
+     */
+    private String mapPropertyToCategoryDisplay(String property) {
+        if (property == null) return "Feature";
+        
+        return switch (property.toLowerCase()) {
+            case "touristattraction" -> "Tourist Attraction";
+            case "iconicattraction" -> "Iconic Attraction";
+            case "activity" -> "Activity";
+            case "excursion" -> "Excursion";
+            case "generalinterest" -> "General Interest";
+            case "mealvenueinfo" -> "Meal Venue";
+            case "restaurantinfo" -> "Restaurant";
+            case "localspecialtymain" -> "Local Specialty (Main)";
+            case "localspecialtydessert" -> "Local Specialty (Dessert)";
+            case "culinaryingredient" -> "Culinary Ingredient";
+            case "servescuisine" -> "Cuisine";
+            default -> property.substring(0, 1).toUpperCase() + property.substring(1).replaceAll("([A-Z])", " $1");
+        };
     }
     
     // DTOs

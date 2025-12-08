@@ -4,6 +4,31 @@ version: '3.8'
 name: sowr
 
 services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: cruise_recommender_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:cruise_recommender}
+      MYSQL_USER: ${MYSQL_USER:cruise_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:cruise_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - cruise_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: --default-authentication-plugin=mysql_native_password
+
    # Redis Cache
   redis:
     image: redis:7-alpine
@@ -198,9 +223,10 @@ services:
     volumes:
       # Persistent storage for TDB2 databases
       - fuseki_data:/fuseki
-      # Optional: Mount databases directory for direct access
+      # Mount databases directory for direct access
       - ./docker/fuseki/databases:/fuseki/databases
-      # Note: Config file removed temporarily - configure via web UI at http://localhost:3030
+      # Mount config file for TDB2 persistent dataset configuration
+      - ./docker/fuseki/config.ttl:/fuseki/config.ttl:ro
     networks:
       - cruise_network
     healthcheck:

@@ -21,8 +21,8 @@ public class JwtTokenProvider {
     private final long jwtExpirationInMs;
     
     public JwtTokenProvider(
-            @Value("${jwt.secret}") String jwtSecret,
-            @Value("${jwt.expiration}") long jwtExpirationInMs) {
+            @Value("${jwt.secret:dev-secret-key-change-in-production-minimum-32-characters-long-for-security}") String jwtSecret,
+            @Value("${jwt.expiration:604800000}") long jwtExpirationInMs) {
         // Validate JWT secret length (must be at least 32 characters/256 bits for HMAC-SHA256)
         if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
             throw new IllegalArgumentException(

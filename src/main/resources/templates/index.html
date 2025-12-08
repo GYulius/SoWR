@@ -124,20 +124,20 @@
                                 <!-- Cruise Ship -->
                                 <div class="mb-4">
                                     <label for="cruiseShipInterests" class="form-label fw-bold">
-                                        <i class="fas fa-ship me-2"></i>Cruise Ship Preferences
+                                        <i class="fas fa-ship me-2"></i>Cruise Ship Name
                                     </label>
                                     <input type="text" class="form-control" id="cruiseShipInterests" 
-                                           placeholder="e.g., Large ships, Family-friendly, Luxury">
+                                           placeholder="e.g., Icon of the Seas, Celebrity Solstice, Siver Nova">
                                     <small class="form-text text-muted">Enter keywords separated by commas</small>
                                 </div>
                                 
                                 <!-- Port of Call -->
                                 <div class="mb-4">
                                     <label for="portInterests" class="form-label fw-bold">
-                                        <i class="fas fa-anchor me-2"></i>Port of Call Preferences
+                                        <i class="fas fa-anchor me-2"></i>Name of the Port
                                     </label>
                                     <input type="text" class="form-control" id="portInterests" 
-                                           placeholder="e.g., Mediterranean, Caribbean, Historical ports">
+                                           placeholder="e.g., Bimini, Adelaide">
                                     <small class="form-text text-muted">Enter keywords separated by commas</small>
                                 </div>
                                 
@@ -154,7 +154,7 @@
                                 <!-- Tourist Attractions -->
                                 <div class="mb-4">
                                     <label for="attractionInterests" class="form-label fw-bold">
-                                        <i class="fas fa-camera me-2"></i>Tourist Attractions
+                                        <i class="fas fa-camera me-2"></i>Touristic Attractions
                                     </label>
                                     <input type="text" class="form-control" id="attractionInterests" 
                                            placeholder="e.g., Museums, Beaches, Historical sites, Art galleries">
@@ -167,7 +167,7 @@
                                         <i class="fas fa-utensils me-2"></i>Meal Venues
                                     </label>
                                     <input type="text" class="form-control" id="mealVenueInterests" 
-                                           placeholder="e.g., Fine dining, Local cuisine, Seafood, Vegetarian">
+                                           placeholder="other than Restaurants, e.g., Coffee Shop">
                                     <small class="form-text text-muted">Enter keywords separated by commas</small>
                                 </div>
                                 
@@ -177,7 +177,7 @@
                                         <i class="fas fa-store me-2"></i>Restaurants
                                     </label>
                                     <input type="text" class="form-control" id="restaurantInterests" 
-                                           placeholder="e.g., Italian, Asian, Mediterranean, Fast food">
+                                           placeholder="e.g., Michelin, Italian, Asian, Mediterranean">
                                     <small class="form-text text-muted">Enter keywords separated by commas</small>
                                 </div>
                                 
@@ -2131,14 +2131,33 @@
             `;
             
             features.forEach(feature => {
-                const label = feature.label || 'Feature';
-                const concept = feature.concept || '';
-                const category = feature.category || '';
+                const featureText = feature.feature || feature.label || 'Feature';
+                const category = feature.categoryDisplay || feature.category || feature.property || 'Feature';
+                const matchedInterests = feature.matchedInterests || [];
+                
                 html += `
                     <li class="list-group-item">
-                        <h6><i class="fas fa-check-circle text-success me-2"></i>${label}</h6>
-                        ${category ? `<small class="text-muted"><i class="fas fa-tag me-1"></i>${category}</small>` : ''}
-                        ${concept ? `<br><small class="text-muted"><i class="fas fa-link me-1"></i>${concept}</small>` : ''}
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">
+                                    <i class="fas fa-check-circle text-success me-2"></i>
+                                    ${featureText}
+                                </h6>
+                                <div class="ms-4">
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="fas fa-tag me-1"></i>
+                                        <strong>Category:</strong> ${category}
+                                    </small>
+                                    ${matchedInterests.length > 0 ? `
+                                        <small class="text-primary d-block">
+                                            <i class="fas fa-heart me-1"></i>
+                                            <strong>Matched Interest${matchedInterests.length > 1 ? 's' : ''}:</strong> 
+                                            ${matchedInterests.join(', ')}
+                                        </small>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
                     </li>
                 `;
             });

@@ -216,12 +216,6 @@
             <version>0.8</version>
         </dependency>
         
-        <!-- WebSocket for Real-time Updates -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-websocket</artifactId>
-        </dependency>
-        
         <!-- Social Media APIs -->
         <!-- Twitter4J for Twitter API -->
         <dependency>

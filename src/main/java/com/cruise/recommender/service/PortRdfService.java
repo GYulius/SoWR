@@ -798,6 +798,7 @@ public class PortRdfService {
         }
         
         // Build FILTER conditions for each interest keyword
+        // Search across multiple property types: schema:touristAttraction, ex:activity, ex:excursion, etc.
         StringBuilder filterConditions = new StringBuilder();
         for (int i = 0; i < interestKeywords.size(); i++) {
             String keyword = interestKeywords.get(i).trim();
@@ -807,7 +808,9 @@ public class PortRdfService {
                 }
                 // Escape special characters for SPARQL
                 String escapedKeyword = keyword.replace("\"", "\\\"").replace("'", "\\'");
-                filterConditions.append(String.format("CONTAINS(LCASE(?label), LCASE(\"%s\"))", escapedKeyword));
+                // Search in all feature properties
+                filterConditions.append(String.format(
+                    "CONTAINS(LCASE(?feature), LCASE(\"%s\"))", escapedKeyword));
             }
         }
         
@@ -818,43 +821,72 @@ public class PortRdfService {
             return response;
         }
         
-        // Build category-specific concept type filters
-        StringBuilder conceptTypeFilter = new StringBuilder();
-        if (interestCategories != null && !interestCategories.isEmpty()) {
-            for (String category : interestCategories) {
-                String conceptType = mapCategoryToConceptType(category);
-                if (conceptType != null) {
-                    if (conceptTypeFilter.length() > 0) {
-                        conceptTypeFilter.append(" || ");
-                    }
-                    conceptTypeFilter.append(String.format("STRSTARTS(STR(?concept), \"%sconcept/%s\")", namespace, conceptType));
-                }
+        // Map port code - handle both short codes (BIM) and full codes (BSBIM)
+        // The RDF data uses ex:code with full UNLOCODE (e.g., "BSBIM")
+        // Try to find the full UNLOCODE from database first
+        String fullPortCode = portCode.toUpperCase();
+        try {
+            Port port = portRepository.findByPortCode(portCode)
+                .orElse(portRepository.findByPortCode(portCode.toUpperCase()).orElse(null));
+            if (port != null && port.getPortCode() != null) {
+                fullPortCode = port.getPortCode().toUpperCase();
+                log.debug("Mapped port code {} to full code {}", portCode, fullPortCode);
             }
+        } catch (Exception e) {
+            log.debug("Could not lookup port code from database, using provided code: {}", portCode);
         }
         
+        // Try exact match and also check if code contains the search term (for partial matches)
+        String portCodeFilter = String.format("(?code = \"%s\" || CONTAINS(?code, \"%s\"))", 
+            fullPortCode, portCode.toUpperCase());
+        
+        // Build query using Schema.org structure from rdf-dataset-1.ttl
+        // Ports are: ex:port_BSBIM with ex:code "BSBIM" and schema:name
+        // Features are stored as: schema:touristAttraction, ex:activity, ex:excursion, 
+        // ex:mealVenueInfo, ex:restaurantInfo, ex:culinaryIngredient, etc.
         String query = String.format("""
-            PREFIX cruise: <%s>
-            PREFIX skos: <%s>
-            PREFIX dcterms: <%s>
+            PREFIX ex: <http://example.org/port-property/>
+            PREFIX schema: <http://schema.org/>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
-            SELECT DISTINCT ?port ?name ?concept ?label WHERE {
-                ?port a cruise:Port .
-                ?port skos:prefLabel ?name .
-                ?port skos:altLabel "%s" .
-                ?port skos:related ?concept .
-                ?concept skos:prefLabel ?label .
+            SELECT DISTINCT ?port ?name ?property ?feature WHERE {
+                ?port rdf:type schema:Marina .
+                ?port schema:name ?name .
+                ?port ex:code ?code .
                 FILTER (%s)
-                %s
+                {
+                    { ?port schema:touristAttraction ?feature . BIND("touristAttraction" AS ?property) }
+                    UNION
+                    { ?port ex:iconicAttraction ?feature . BIND("iconicAttraction" AS ?property) }
+                    UNION
+                    { ?port ex:activity ?feature . BIND("activity" AS ?property) }
+                    UNION
+                    { ?port ex:excursion ?feature . BIND("excursion" AS ?property) }
+                    UNION
+                    { ?port ex:generalInterest ?feature . BIND("generalInterest" AS ?property) }
+                    UNION
+                    { ?port ex:mealVenueInfo ?feature . BIND("mealVenueInfo" AS ?property) }
+                    UNION
+                    { ?port ex:restaurantInfo ?feature . BIND("restaurantInfo" AS ?property) }
+                    UNION
+                    { ?port ex:localSpecialtyMain ?feature . BIND("localSpecialtyMain" AS ?property) }
+                    UNION
+                    { ?port ex:localSpecialtyDessert ?feature . BIND("localSpecialtyDessert" AS ?property) }
+                    UNION
+                    { ?port ex:culinaryIngredient ?feature . BIND("culinaryIngredient" AS ?property) }
+                    UNION
+                    { ?port schema:servesCuisine ?feature . BIND("servesCuisine" AS ?property) }
+                }
+                FILTER (%s)
             }
-            ORDER BY ?name ?label
+            ORDER BY ?name ?property ?feature
             """, 
-            namespace, SKOS_NS, DCTERMS_NS, portCode, 
-            filterConditions.toString(),
-            conceptTypeFilter.length() > 0 ? String.format("FILTER (%s)", conceptTypeFilter.toString()) : "");
+            portCodeFilter,
+            filterConditions.toString());
         
         log.info("Executing SPARQL query for portCode {}:\n{}", portCode, query);
         log.debug("Filter conditions: {}", filterConditions.toString());
-        log.debug("Concept type filter: {}", conceptTypeFilter.length() > 0 ? conceptTypeFilter.toString() : "none");
+        log.debug("Port code filter: {}", portCodeFilter);
         
         List<QuerySolution> results = queryPorts(query);
         log.info("SPARQL query returned {} results for portCode: {}", results.size(), portCode);
