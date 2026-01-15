@@ -699,6 +699,9 @@ See `docs/SYSTEM_PERFORMANCE_MONITORING.md` for detailed monitoring documentatio
 
 ## 🤝 Contributing
 
+Iulian Gherghevici
+Antonia Cojocaru
+
 We welcome contributions from the community! Please follow these guidelines:
 
 ### Getting Started

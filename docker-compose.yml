@@ -1,35 +1,32 @@
-version: '3.8'
-
 # Project name for Docker Desktop stack grouping
 name: sowr
 
 services:
-  # MySQL Database
   mysql:
     image: mysql:8.0
     container_name: cruise_recommender_mysql
     restart: unless-stopped
     ports:
-      - "3306:3306"
+      - "3307:3306"  # Using 3307 on host to avoid conflict with local MySQL on 3306
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:root_password}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:cruise_recommender}
-      MYSQL_USER: ${MYSQL_USER:cruise_app}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:cruise_password}
+      MYSQL_DATABASE: cruise_recommender
+      MYSQL_USER: cruise_app
+      MYSQL_PASSWORD: cruise_password
+      MYSQL_ROOT_PASSWORD: root_password
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database:/docker-entrypoint-initdb.d
     networks:
       - cruise_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     command: --default-authentication-plugin=mysql_native_password
 
-   # Redis Cache
+    # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: cruise_recommender_redis
@@ -241,6 +238,158 @@ services:
     #   mysql:
     #     condition: service_healthy
 
+  # Spark Master Node for Big Data Analytics
+  spark-master:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: cruise_recommender_spark_master
+    hostname: spark-master
+    restart: unless-stopped
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8080
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "8080:8080"  # Spark Master Web UI
+      - "7077:7077"  # Spark Master RPC Port
+    volumes:
+      - spark_master_data:/opt/spark/work
+      - ./docker/spark/conf:/opt/spark/conf:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data:ro
+    networks:
+      - cruise_network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Spark Worker Node 1
+  spark-worker-1:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: cruise_recommender_spark_worker_1
+    hostname: spark-worker-1
+    restart: unless-stopped
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --webui-port 8081
+      --cores 2
+      --memory 2g
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+    ports:
+      - "8081:8081"  # Worker Web UI
+    volumes:
+      - spark_worker1_data:/opt/spark/work
+      - ./docker/spark/conf:/opt/spark/conf:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data:ro
+    depends_on:
+      - spark-master
+    networks:
+      - cruise_network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Spark Worker Node 2
+  spark-worker-2:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: cruise_recommender_spark_worker_2
+    hostname: spark-worker-2
+    restart: unless-stopped
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --webui-port 8081
+      --cores 2
+      --memory 2g
+    environment:
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+    ports:
+      - "8082:8081"  # Worker Web UI
+    volumes:
+      - spark_worker2_data:/opt/spark/work
+      - ./docker/spark/conf:/opt/spark/conf:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./data:/workspace/data:ro
+    depends_on:
+      - spark-master
+    networks:
+      - cruise_network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # JupyterLab with PySpark 3.5.0 for Big Data Analytics
+  jupyterlab:
+    build:
+      context: ./docker/jupyterlab
+      dockerfile: Dockerfile
+    container_name: cruise_recommender_jupyterlab
+    hostname: jupyterlab
+    restart: unless-stopped
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_DRIVER_MEMORY=2g
+      - SPARK_EXECUTOR_MEMORY=2g
+      - SPARK_EXECUTOR_CORES=2
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=jupyter
+      - PYSPARK_DRIVER_PYTHON_OPTS=lab
+      - FUSEKI_ENDPOINT=http://fuseki:3030/cruise_kg/sparql
+      - FUSEKI_UPDATE_ENDPOINT=http://fuseki:3030/cruise_kg/update
+      - FUSEKI_USERNAME=${FUSEKI_ADMIN_USER:-admin}
+      - FUSEKI_PASSWORD=${FUSEKI_ADMIN_PASSWORD:-admin}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-cruise_recommender}
+      - MYSQL_USER=${MYSQL_USER:-cruise_app}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-cruise_password}
+    ports:
+      - "8888:8888"  # JupyterLab
+    volumes:
+      - jupyterlab_data:/home/jovyan/work
+      - ./scripts:/home/jovyan/work/scripts:ro
+      - ./data:/home/jovyan/work/data:ro
+      - ./notebooks:/home/jovyan/work/notebooks:rw
+    depends_on:
+      - spark-master
+      - spark-worker-1
+      - spark-worker-2
+      - fuseki
+      - mysql
+    networks:
+      - cruise_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
   mysql_data:
   redis_data:
@@ -249,6 +398,10 @@ volumes:
   grafana_data:
   prometheus_data:
   fuseki_data:
+  spark_master_data:
+  spark_worker1_data:
+  spark_worker2_data:
+  jupyterlab_data:
 
 networks:
   cruise_network:

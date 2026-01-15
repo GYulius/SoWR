@@ -100,6 +100,9 @@ public class SecurityConfig {
                 .requestMatchers("/login", "/login.html", "/").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/static/**").permitAll()
                 
+                // Notebooks JSON files (recommendations) - require authentication
+                .requestMatchers("/notebooks/**").authenticated()
+                
                 // Public API endpoints (for frontend)
                 .requestMatchers("/ports/**").permitAll()
                 .requestMatchers("/ships").permitAll() // Public ships endpoint for dropdown
