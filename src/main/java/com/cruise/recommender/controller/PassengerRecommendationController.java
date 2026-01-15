@@ -49,6 +49,8 @@ public class PassengerRecommendationController {
     private final CruiseScheduleRepository cruiseScheduleRepository;
     private final CruiseShipRepository cruiseShipRepository;
     private final PortRepository portRepository;
+    private final com.cruise.recommender.service.PortProximityService portProximityService;
+    private final com.cruise.recommender.service.RecommendationOrchestratorService recommendationOrchestratorService;
     
     /**
      * Get or create a passenger profile for a user
@@ -307,6 +309,218 @@ public class PassengerRecommendationController {
         return ResponseEntity.ok(responses);
     }
     
+    @GetMapping("/{passengerId}/ship-info")
+    @Operation(summary = "Get passenger ship and approaching port info", 
+               description = "Get the cruise ship the passenger is on and the next approaching port based on AIS route data")
+    public ResponseEntity<Map<String, Object>> getPassengerShipInfo(
+            @Parameter(description = "Passenger ID") @PathVariable Long passengerId) {
+        
+        log.info("Getting ship info for passenger: {}", passengerId);
+        
+        Passenger passenger = passengerRepository.findById(passengerId)
+                .orElseThrow(() -> new RuntimeException("Passenger not found"));
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        // Get passenger interests to find preferred ship
+        List<PassengerInterest> interests = passengerInterestRepository.findByPassenger(passenger);
+        Optional<PassengerInterest> cruiseShipInterest = interests.stream()
+            .filter(i -> "CRUISE_SHIP".equalsIgnoreCase(i.getInterestCategory()))
+            .findFirst();
+        
+        CruiseShip ship = null;
+        String preferredShipName = null;
+        
+        // Priority 1: Use ship from CRUISE_SHIP interest if available
+        if (cruiseShipInterest.isPresent()) {
+            preferredShipName = cruiseShipInterest.get().getInterestKeyword();
+            log.info("Found CRUISE_SHIP interest: {}", preferredShipName);
+            
+            // Extract to final variable for lambda
+            final String shipNameToFind = preferredShipName;
+            
+            // Try to find ship by name (exact match first, then partial)
+            List<CruiseShip> shipsByName = cruiseShipRepository.findAll().stream()
+                .filter(s -> s.getName() != null && 
+                    (s.getName().equalsIgnoreCase(shipNameToFind) ||
+                     s.getName().toLowerCase().contains(shipNameToFind.toLowerCase()) ||
+                     shipNameToFind.toLowerCase().contains(s.getName().toLowerCase())))
+                .collect(Collectors.toList());
+            
+            if (!shipsByName.isEmpty()) {
+                ship = shipsByName.get(0);
+                log.info("Found ship from interest: {} (MMSI: {})", ship.getName(), ship.getMmsi());
+            } else {
+                log.warn("Ship '{}' from interests not found in database", preferredShipName);
+            }
+        }
+        
+        // Priority 2: Use ship from passenger's schedule if no interest ship found
+        if (ship == null) {
+            CruiseSchedule schedule = passenger.getCruiseSchedule();
+            if (schedule != null && schedule.getShip() != null) {
+                ship = schedule.getShip();
+                log.info("Using ship from schedule: {} (MMSI: {})", ship.getName(), ship.getMmsi());
+            }
+        }
+        
+        if (ship != null) {
+            response.put("shipName", ship.getName());
+            response.put("shipMmsi", ship.getMmsi());
+            response.put("preferredShipName", preferredShipName != null ? preferredShipName : ship.getName());
+            
+            // Find approaching port based on preferred ship's current position from AIS data
+            if (ship.getCurrentLatitude() != null && ship.getCurrentLongitude() != null) {
+                log.info("Using ship position for port calculation: lat={}, lng={}", 
+                        ship.getCurrentLatitude(), ship.getCurrentLongitude());
+                
+                Optional<com.cruise.recommender.service.PortProximityService.PortProximityEvent> proximityEvent = 
+                    portProximityService.checkPortProximity(
+                        ship.getCurrentLatitude(),
+                        ship.getCurrentLongitude(),
+                        50.0 // 50 nautical miles threshold
+                    );
+                
+                if (proximityEvent.isPresent()) {
+                    Port approachingPort = proximityEvent.get().getPort();
+                    log.info("Ship {} is approaching port: {} ({} nm away)", 
+                            ship.getName(), approachingPort.getName(), 
+                            proximityEvent.get().getDistanceNauticalMiles());
+                    response.put("approachingPort", Map.of(
+                        "id", approachingPort.getId(),
+                        "name", approachingPort.getName(),
+                        "portCode", approachingPort.getPortCode() != null ? approachingPort.getPortCode() : "",
+                        "country", approachingPort.getCountry() != null ? approachingPort.getCountry() : "",
+                        "distanceNauticalMiles", proximityEvent.get().getDistanceNauticalMiles()
+                    ));
+                } else {
+                    // Find nearest port even if not within threshold
+                    // Extract ship position to final variables for lambda
+                    final Double shipLat = ship.getCurrentLatitude();
+                    final Double shipLng = ship.getCurrentLongitude();
+                    
+                    List<Port> allPorts = portRepository.findAll();
+                    Port nearestPort = allPorts.stream()
+                        .min((p1, p2) -> {
+                            double dist1 = calculateDistance(
+                                shipLat, shipLng,
+                                p1.getLatitude(), p1.getLongitude());
+                            double dist2 = calculateDistance(
+                                shipLat, shipLng,
+                                p2.getLatitude(), p2.getLongitude());
+                            return Double.compare(dist1, dist2);
+                        })
+                        .orElse(null);
+                    
+                    if (nearestPort != null) {
+                        double distance = calculateDistance(
+                            ship.getCurrentLatitude(), ship.getCurrentLongitude(),
+                            nearestPort.getLatitude(), nearestPort.getLongitude());
+                        log.info("Ship {} nearest port: {} ({} nm away)", 
+                                ship.getName(), nearestPort.getName(), distance);
+                        response.put("approachingPort", Map.of(
+                            "id", nearestPort.getId(),
+                            "name", nearestPort.getName(),
+                            "portCode", nearestPort.getPortCode() != null ? nearestPort.getPortCode() : "",
+                            "country", nearestPort.getCountry() != null ? nearestPort.getCountry() : "",
+                            "distanceNauticalMiles", distance
+                        ));
+                    } else {
+                        log.warn("No ports found in database for ship position calculation");
+                    }
+                }
+            } else {
+                log.warn("Ship {} has no current position (AIS data) - cannot calculate approaching port", ship.getName());
+            }
+        } else {
+            log.warn("No ship found for passenger {} - neither from interests nor schedule", passengerId);
+            // Still set preferred ship name if we have it from interests
+            if (preferredShipName != null) {
+                response.put("preferredShipName", preferredShipName);
+            }
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Calculate distance between two points in nautical miles using Haversine formula
+     */
+    private double calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+        double earthRadiusKm = 6371.0;
+        double earthRadiusNm = earthRadiusKm / 1.852; // Convert to nautical miles
+        
+        double lat1Rad = Math.toRadians(lat1);
+        double lat2Rad = Math.toRadians(lat2);
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLng = Math.toRadians(lng2 - lng1);
+        
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                   Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                   Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return earthRadiusNm * c;
+    }
+    
+    @GetMapping("/{passengerId}/als-recommendations")
+    @Operation(summary = "Get ALS-based recommendations for passenger at port", 
+               description = "Uses SparkML Alternating Least Squares (ALS) collaborative filtering to generate personalized recommendations")
+    public ResponseEntity<Map<String, Object>> getAlsRecommendations(
+            @Parameter(description = "Passenger ID") @PathVariable Long passengerId,
+            @Parameter(description = "Port ID") @RequestParam Long portId) {
+        
+        log.info("Getting ALS-based recommendations for passenger {} at port {}", 
+                passengerId, portId);
+        
+        try {
+            Passenger passenger = passengerRepository.findById(passengerId)
+                    .orElseThrow(() -> new RuntimeException("Passenger not found"));
+            
+            Port port = portRepository.findById(portId)
+                    .orElseThrow(() -> new RuntimeException("Port not found"));
+            
+            // Generate ALS recommendations using the orchestrator service
+            // This internally uses SPARQL to get port features and ALS to generate recommendations
+            List<com.cruise.recommender.service.RecommendationOrchestratorService.RecommendationItem> recommendations = 
+                recommendationOrchestratorService.generateRecommendationsForPassenger(passenger, port);
+            
+            // Format recommendations for response
+            List<Map<String, Object>> formattedRecommendations = recommendations.stream()
+                .map(rec -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("itemName", rec.getItemName());
+                    item.put("category", rec.getCategory());
+                    item.put("predictedRating", rec.getPredictedRating());
+                    item.put("reason", rec.getReason());
+                    return item;
+                })
+                .collect(Collectors.toList());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("passengerId", passengerId);
+            response.put("portId", portId);
+            response.put("portName", port.getName());
+            response.put("portCode", port.getPortCode());
+            response.put("recommendations", formattedRecommendations);
+            response.put("count", formattedRecommendations.size());
+            response.put("algorithm", "SparkML ALS (Alternating Least Squares)");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("Error getting ALS-based recommendations for passenger {} at port {}: {}", 
+                    passengerId, portId, e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of(
+                        "error", "Failed to generate ALS recommendations",
+                        "message", e.getMessage(),
+                        "passengerId", passengerId,
+                        "portId", portId
+                    ));
+        }
+    }
+    
     @PostMapping("/{passengerId}/interests")
     @Operation(summary = "Save passenger interests", 
                description = "Save or update passenger interests")
@@ -393,8 +607,30 @@ public class PassengerRecommendationController {
                 interestKeywords.size(), interestCategories.size(), port.getName(), port.getPortCode());
         
         // Query SPARQL knowledge graph
-        Map<String, Object> sparqlResponse = portRdfService.findPortFeaturesByInterestsWithQuery(
-                port.getPortCode(), interestKeywords, interestCategories);
+        Map<String, Object> sparqlResponse;
+        try {
+            sparqlResponse = portRdfService.findPortFeaturesByInterestsWithQuery(
+                    port.getPortCode(), interestKeywords, interestCategories);
+        } catch (Exception e) {
+            log.error("Failed to execute SPARQL query for passenger {} at port {}: {}", 
+                    passengerId, port.getPortCode(), e.getMessage(), e);
+            
+            // Check if it's a connectivity issue
+            String errorMessage = e.getMessage();
+            if (errorMessage != null && (errorMessage.contains("Service Unavailable") || 
+                    errorMessage.contains("Connection refused") || 
+                    errorMessage.contains("connect"))) {
+                errorMessage = "Fuseki SPARQL server is not available. Please ensure Fuseki is running. " +
+                        "Check Docker container 'cruise_recommender_fuseki' is running and accessible at http://localhost:3030";
+            }
+            
+            return ResponseEntity.status(500)
+                    .body(Map.of(
+                            "error", "Failed to execute SPARQL query: " + errorMessage,
+                            "query", "",
+                            "results", List.of()
+                    ));
+        }
         
         @SuppressWarnings("unchecked")
         List<QuerySolution> sparqlResults = (List<QuerySolution>) sparqlResponse.get("results");

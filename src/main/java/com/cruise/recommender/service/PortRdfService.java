@@ -2,6 +2,7 @@ package com.cruise.recommender.service;
 
 import com.cruise.recommender.entity.Port;
 import com.cruise.recommender.repository.PortRepository;
+import com.cruise.recommender.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.jena.query.*;
@@ -38,6 +39,7 @@ import java.util.Map;
 public class PortRdfService {
     
     private final PortRepository portRepository;
+    private final StatisticsService statisticsService;
     
     // Fuseki SPARQL endpoints
     @Value("${knowledge.graph.endpoint:http://localhost:3030/cruise_kg/sparql}")
@@ -785,6 +787,13 @@ public class PortRdfService {
      * @return A map containing "query" (the SPARQL query string) and "results" (the query solutions)
      */
     public Map<String, Object> findPortFeaturesByInterestsWithQuery(String portCode, List<String> interestKeywords, List<String> interestCategories) {
+        long startTime = System.currentTimeMillis();
+        String queryType = "port_features_by_interests";
+        boolean success = false;
+        String errorType = null;
+        int resultCount = 0;
+        String query = "";
+        
         log.info("Finding port features by interests for portCode: {}, keywords: {}, categories: {}", 
                 portCode, interestKeywords, interestCategories);
         
@@ -794,6 +803,9 @@ public class PortRdfService {
             log.warn("No interest keywords provided for portCode: {}", portCode);
             response.put("query", "");
             response.put("results", List.<QuerySolution>of());
+            // Record empty query statistics
+            long durationMs = System.currentTimeMillis() - startTime;
+            statisticsService.recordSparqlQuery(queryType, true, durationMs, null, 0, null);
             return response;
         }
         
@@ -818,6 +830,9 @@ public class PortRdfService {
             log.warn("No valid interest keywords after filtering for portCode: {}", portCode);
             response.put("query", "");
             response.put("results", List.<QuerySolution>of());
+            // Record empty query statistics
+            long durationMs = System.currentTimeMillis() - startTime;
+            statisticsService.recordSparqlQuery(queryType, true, durationMs, null, 0, null);
             return response;
         }
         
@@ -844,7 +859,7 @@ public class PortRdfService {
         // Ports are: ex:port_BSBIM with ex:code "BSBIM" and schema:name
         // Features are stored as: schema:touristAttraction, ex:activity, ex:excursion, 
         // ex:mealVenueInfo, ex:restaurantInfo, ex:culinaryIngredient, etc.
-        String query = String.format("""
+        query = String.format("""
             PREFIX ex: <http://example.org/port-property/>
             PREFIX schema: <http://schema.org/>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -888,11 +903,40 @@ public class PortRdfService {
         log.debug("Filter conditions: {}", filterConditions.toString());
         log.debug("Port code filter: {}", portCodeFilter);
         
-        List<QuerySolution> results = queryPorts(query);
-        log.info("SPARQL query returned {} results for portCode: {}", results.size(), portCode);
+        try {
+            List<QuerySolution> results = queryPorts(query);
+            resultCount = results.size();
+            success = true;
+            log.info("SPARQL query returned {} results for portCode: {}", results.size(), portCode);
+            
+            response.put("query", query);
+            response.put("results", results);
+        } catch (Exception e) {
+            log.error("Error executing SPARQL query for portCode {}: {}", portCode, e.getMessage(), e);
+            errorType = e.getClass().getSimpleName();
+            if (e.getMessage() != null) {
+                if (e.getMessage().contains("Service Unavailable") || e.getMessage().contains("Connection refused")) {
+                    errorType = "ServiceUnavailable";
+                }
+            }
+            response.put("query", query);
+            response.put("results", List.<QuerySolution>of());
+            throw e; // Re-throw to let caller handle
+        } finally {
+            // Record statistics
+            long durationMs = System.currentTimeMillis() - startTime;
+            String queryHash = query != null && !query.isEmpty() ? 
+                String.valueOf(query.hashCode()) : null;
+            statisticsService.recordSparqlQuery(
+                queryType,
+                success,
+                durationMs,
+                errorType,
+                resultCount,
+                queryHash
+            );
+        }
         
-        response.put("query", query);
-        response.put("results", results);
         return response;
     }
     

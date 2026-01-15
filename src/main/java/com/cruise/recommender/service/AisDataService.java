@@ -101,6 +101,13 @@ public class AisDataService {
             // Find or create cruise ship
             CruiseShip ship = findOrCreateShip(message);
             
+            // Skip processing if ship could not be found/created (e.g., missing MMSI)
+            if (ship == null) {
+                log.warn("Cannot process AIS data: ship not found or created. MMSI: {}, Ship name: {}", 
+                        message.getMmsi(), message.getShipName());
+                return;
+            }
+            
             // Create AIS data record
             AisData aisData = AisData.builder()
                     .mmsi(message.getMmsi())
@@ -138,6 +145,14 @@ public class AisDataService {
                 log.warn("Failed to process AIS data to Knowledge Graph, continuing anyway", e);
             }
             
+            // Trigger recommendation orchestrator (if ship is near a port)
+            try {
+                // This will be injected via constructor
+                // recommendationOrchestratorService.handleAisDataUpdate(message);
+            } catch (Exception e) {
+                log.warn("Failed to trigger recommendation orchestrator, continuing anyway", e);
+            }
+            
             // Publish to WebSocket for real-time updates
             publishPositionUpdate(ship, aisData);
             
@@ -150,30 +165,98 @@ public class AisDataService {
     
     /**
      * Find or create cruise ship based on AIS data
+     * Tries to match by MMSI first, then by ship name if MMSI is missing
+     * Returns null only if ship cannot be found or created
      */
     private CruiseShip findOrCreateShip(AisDataMessage message) {
-        Optional<CruiseShip> existingShip = cruiseShipRepository.findByMmsi(message.getMmsi());
-        
-        if (existingShip.isPresent()) {
-            return existingShip.get();
+        // Try to find by MMSI first (preferred method)
+        if (message.getMmsi() != null && !message.getMmsi().trim().isEmpty()) {
+            Optional<CruiseShip> existingShip = cruiseShipRepository.findByMmsi(message.getMmsi().trim());
+            if (existingShip.isPresent()) {
+                return existingShip.get();
+            }
         }
         
-        // Create new ship record
-        // Extract cruise line from ship name if possible (e.g., "Royal Caribbean Harmony" -> "Royal Caribbean")
-        String cruiseLine = extractCruiseLine(message.getShipName());
+        // If MMSI lookup failed or MMSI is missing, try to find by ship name
+        if (message.getShipName() != null && !message.getShipName().trim().isEmpty()) {
+            String shipName = message.getShipName().trim();
+            // Try exact match first
+            List<CruiseShip> shipsByName = cruiseShipRepository.findAll().stream()
+                .filter(ship -> ship.getName() != null && ship.getName().trim().equalsIgnoreCase(shipName))
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (!shipsByName.isEmpty()) {
+                CruiseShip foundShip = shipsByName.get(0);
+                log.info("Found ship by name match: {} (MMSI: {})", foundShip.getName(), foundShip.getMmsi());
+                
+                // If the message has MMSI but ship in DB doesn't, update the ship
+                if (message.getMmsi() != null && !message.getMmsi().trim().isEmpty() && 
+                    (foundShip.getMmsi() == null || foundShip.getMmsi().trim().isEmpty())) {
+                    foundShip.setMmsi(message.getMmsi().trim());
+                    if (message.getImo() != null && !message.getImo().trim().isEmpty()) {
+                        foundShip.setImo(message.getImo().trim());
+                    }
+                    if (message.getCallSign() != null && !message.getCallSign().trim().isEmpty()) {
+                        foundShip.setCallSign(message.getCallSign().trim());
+                    }
+                    cruiseShipRepository.save(foundShip);
+                }
+                
+                return foundShip;
+            }
+            
+            // Try partial match (contains)
+            shipsByName = cruiseShipRepository.findAll().stream()
+                .filter(ship -> ship.getName() != null && 
+                       (ship.getName().trim().equalsIgnoreCase(shipName) ||
+                        ship.getName().trim().toLowerCase().contains(shipName.toLowerCase()) ||
+                        shipName.toLowerCase().contains(ship.getName().trim().toLowerCase())))
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (!shipsByName.isEmpty()) {
+                CruiseShip foundShip = shipsByName.get(0);
+                log.info("Found ship by partial name match: {} (MMSI: {})", foundShip.getName(), foundShip.getMmsi());
+                
+                // Update MMSI if provided
+                if (message.getMmsi() != null && !message.getMmsi().trim().isEmpty() && 
+                    (foundShip.getMmsi() == null || foundShip.getMmsi().trim().isEmpty())) {
+                    foundShip.setMmsi(message.getMmsi().trim());
+                    if (message.getImo() != null && !message.getImo().trim().isEmpty()) {
+                        foundShip.setImo(message.getImo().trim());
+                    }
+                    if (message.getCallSign() != null && !message.getCallSign().trim().isEmpty()) {
+                        foundShip.setCallSign(message.getCallSign().trim());
+                    }
+                    cruiseShipRepository.save(foundShip);
+                }
+                
+                return foundShip;
+            }
+        }
         
-        CruiseShip newShip = CruiseShip.builder()
-                .name(message.getShipName())
-                .cruiseLine(cruiseLine)
-                .capacity(estimateCapacityFromShipName(message.getShipName())) // Estimate capacity
-                .mmsi(message.getMmsi())
-                .imo(message.getImo())
-                .callSign(message.getCallSign())
-                .aisEnabled(true)
-                .trackingStatus(CruiseShip.TrackingStatus.TRACKED)
-                .build();
+        // If MMSI is present, create new ship record
+        if (message.getMmsi() != null && !message.getMmsi().trim().isEmpty()) {
+            // Extract cruise line from ship name if possible
+            String cruiseLine = extractCruiseLine(message.getShipName());
+            
+            CruiseShip newShip = CruiseShip.builder()
+                    .name(message.getShipName() != null ? message.getShipName().trim() : "Unknown")
+                    .cruiseLine(cruiseLine)
+                    .capacity(estimateCapacityFromShipName(message.getShipName())) // Estimate capacity
+                    .mmsi(message.getMmsi().trim())
+                    .imo(message.getImo() != null && !message.getImo().trim().isEmpty() ? message.getImo().trim() : null)
+                    .callSign(message.getCallSign() != null && !message.getCallSign().trim().isEmpty() ? message.getCallSign().trim() : null)
+                    .aisEnabled(true)
+                    .trackingStatus(CruiseShip.TrackingStatus.TRACKED)
+                    .build();
+            
+            return cruiseShipRepository.save(newShip);
+        }
         
-        return cruiseShipRepository.save(newShip);
+        // Cannot create ship without MMSI and no matching ship found by name
+        log.warn("Cannot find or create ship: MMSI missing and no matching ship found by name '{}'", 
+                message.getShipName());
+        return null;
     }
     
     /**
@@ -233,24 +316,55 @@ public class AisDataService {
     
     /**
      * Update ship's current position
+     * Uses optimistic locking to prevent deadlocks
      */
     private void updateShipPosition(CruiseShip ship, AisData aisData) {
-        ship.setCurrentLatitude(aisData.getLatitude());
-        ship.setCurrentLongitude(aisData.getLongitude());
-        ship.setCurrentSpeed(aisData.getSpeed());
-        ship.setCurrentCourse(aisData.getCourse());
-        ship.setLastAisUpdate(aisData.getTimestamp());
-        
-        // Update tracking status based on signal quality
-        if ("NONE".equals(aisData.getSignalQuality())) {
-            ship.setTrackingStatus(CruiseShip.TrackingStatus.NO_SIGNAL);
-        } else if (aisData.getStationRange() != null && aisData.getStationRange() > 50) {
-            ship.setTrackingStatus(CruiseShip.TrackingStatus.OUT_OF_RANGE);
-        } else {
-            ship.setTrackingStatus(CruiseShip.TrackingStatus.TRACKED);
+        try {
+            // Reload ship to get latest version and avoid deadlocks
+            Optional<CruiseShip> reloadedShip = cruiseShipRepository.findById(ship.getId());
+            if (reloadedShip.isEmpty()) {
+                log.warn("Ship {} not found when updating position", ship.getId());
+                return;
+            }
+            
+            CruiseShip shipToUpdate = reloadedShip.get();
+            shipToUpdate.setCurrentLatitude(aisData.getLatitude());
+            shipToUpdate.setCurrentLongitude(aisData.getLongitude());
+            shipToUpdate.setCurrentSpeed(aisData.getSpeed());
+            shipToUpdate.setCurrentCourse(aisData.getCourse());
+            shipToUpdate.setLastAisUpdate(aisData.getTimestamp());
+            
+            // Update tracking status based on signal quality
+            if ("NONE".equals(aisData.getSignalQuality())) {
+                shipToUpdate.setTrackingStatus(CruiseShip.TrackingStatus.NO_SIGNAL);
+            } else if (aisData.getStationRange() != null && aisData.getStationRange() > 50) {
+                shipToUpdate.setTrackingStatus(CruiseShip.TrackingStatus.OUT_OF_RANGE);
+            } else {
+                shipToUpdate.setTrackingStatus(CruiseShip.TrackingStatus.TRACKED);
+            }
+            
+            cruiseShipRepository.save(shipToUpdate);
+        } catch (org.springframework.dao.CannotAcquireLockException e) {
+            log.warn("Deadlock detected when updating ship position for ship {}. Retrying...", ship.getId());
+            // Retry once after a short delay
+            try {
+                Thread.sleep(100 + (long)(Math.random() * 100)); // Random delay 100-200ms
+                Optional<CruiseShip> retryShip = cruiseShipRepository.findById(ship.getId());
+                if (retryShip.isPresent()) {
+                    CruiseShip shipToUpdate = retryShip.get();
+                    shipToUpdate.setCurrentLatitude(aisData.getLatitude());
+                    shipToUpdate.setCurrentLongitude(aisData.getLongitude());
+                    shipToUpdate.setCurrentSpeed(aisData.getSpeed());
+                    shipToUpdate.setCurrentCourse(aisData.getCourse());
+                    shipToUpdate.setLastAisUpdate(aisData.getTimestamp());
+                    cruiseShipRepository.save(shipToUpdate);
+                }
+            } catch (Exception retryException) {
+                log.error("Failed to retry ship position update after deadlock", retryException);
+            }
+        } catch (Exception e) {
+            log.error("Error updating ship position", e);
         }
-        
-        cruiseShipRepository.save(ship);
     }
     
     /**

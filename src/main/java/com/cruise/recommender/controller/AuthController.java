@@ -11,6 +11,7 @@ import com.cruise.recommender.security.JwtTokenProvider;
 import com.cruise.recommender.security.UserPrincipal;
 import com.cruise.recommender.service.EmailService;
 import com.cruise.recommender.service.FacebookTokenValidationService;
+import com.cruise.recommender.service.FacebookInterestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,7 @@ public class AuthController {
     private final EmailService emailService;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final FacebookTokenValidationService facebookTokenValidationService;
+    private final FacebookInterestService facebookInterestService;
     
     @Value("${social.media.facebook.app.id:}")
     private String facebookAppId;
@@ -137,7 +139,7 @@ public class AuthController {
                 if (!emailVerified) {
                     log.info("Login blocked for unverified email: {}", user.getEmail());
                     return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body("Please verify your email address before logging in. Check your inbox for the verification email.");
+                            .body("Please verify your email address before logging in. Check your inbox for the verification email sent from cruisint@its-gilian.com. You can request a new verification code if needed.");
                 }
                 
                 // Generate verification code for identity verification
@@ -159,11 +161,22 @@ public class AuthController {
                 emailVerificationTokenRepository.save(emailToken);
                 
                 // Send verification code email
+                log.info(">>> CALLING EMAIL SERVICE FOR LOGIN VERIFICATION <<<");
+                log.info("User email: {}", user.getEmail());
+                log.info("User first name: {}", user.getFirstName());
+                log.info("Verification code: {}", verificationCode);
                 try {
-                    emailService.sendVerificationCode(user.getEmail(), user.getFirstName(), verificationCode);
-                    log.info("Verification code sent for login to: {}", user.getEmail());
+                    // Use synchronous method to catch exceptions immediately
+                    emailService.sendVerificationCodeSync(user.getEmail(), user.getFirstName(), verificationCode);
+                    log.info("✓ Verification code sent successfully for login to: {}", user.getEmail());
                 } catch (Exception e) {
-                    log.error("Failed to send verification code for login to: {}", user.getEmail(), e);
+                    log.error("✗ FAILED to send verification code for login to: {}", user.getEmail());
+                    log.error("Exception: {}", e.getClass().getName());
+                    log.error("Message: {}", e.getMessage());
+                    if (e.getCause() != null) {
+                        log.error("Cause: {}", e.getCause().getMessage());
+                    }
+                    log.error("Full stack trace:", e);
                     // Don't block login if email fails - allow user to request resend
                     log.warn("Email sending failed, but allowing user to proceed. They can use resend code feature.");
                 }
@@ -293,12 +306,24 @@ public class AuthController {
         
         // Send verification code email
         boolean emailSent = false;
+        log.info(">>> CALLING EMAIL SERVICE FOR REGISTRATION <<<");
+        log.info("User email: {}", user.getEmail());
+        log.info("User first name: {}", user.getFirstName());
+        log.info("Verification code: {}", verificationCode);
         try {
-            emailService.sendVerificationCode(user.getEmail(), user.getFirstName(), verificationCode);
+            // Use synchronous method to catch exceptions immediately
+            emailService.sendVerificationCodeSync(user.getEmail(), user.getFirstName(), verificationCode);
             emailSent = true;
-            log.info("Verification code email sent to: {}", user.getEmail());
+            log.info("✓ Verification code email sent successfully to: {}", user.getEmail());
         } catch (Exception e) {
-            log.error("Failed to send verification code email to: {}", user.getEmail(), e);
+            log.error("✗ FAILED to send verification code email to: {}", user.getEmail());
+            log.error("Exception Type: {}", e.getClass().getName());
+            log.error("Exception Message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("Cause: {}", e.getCause().getMessage());
+                log.error("Cause Type: {}", e.getCause().getClass().getName());
+            }
+            log.error("Full stack trace:", e);
             // Log the code for manual verification if email fails
             log.warn("MANUAL VERIFICATION CODE for new user {} (ID: {}): {}", user.getEmail(), user.getId(), verificationCode);
             // Don't fail registration if email fails, but log it
@@ -393,7 +418,6 @@ public class AuthController {
             verificationToken.setVerifiedAt(LocalDateTime.now());
             emailVerificationTokenRepository.save(verificationToken);
             
-            // If this is a login verification, generate JWT token
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Verification successful!");
             response.put("email", user.getEmail());
@@ -401,7 +425,10 @@ public class AuthController {
             
             // Check if this is a login verification (user is authenticated but needs code)
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UserPrincipal) {
+            boolean isAuthenticated = auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UserPrincipal;
+            
+            // If user is authenticated, complete login
+            if (isAuthenticated) {
                 UserPrincipal userPrincipal = (UserPrincipal) auth.getPrincipal();
                 if (userPrincipal.getId().equals(user.getId())) {
                     // Generate JWT token for login
@@ -419,6 +446,63 @@ public class AuthController {
                     response.put("role", user.getRole().name());
                     response.put("firstName", user.getFirstName());
                     response.put("lastName", user.getLastName());
+                    
+                    log.info("✓ Login completed after email verification (user was authenticated) for user: {}", user.getEmail());
+                }
+            } else {
+                // User is not authenticated - check if this was part of a login flow
+                // If verification token was created recently (within last 10 minutes), 
+                // it was likely part of a login attempt where password was already verified
+                LocalDateTime tokenCreated = verificationToken.getCreatedAt();
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime tenMinutesAgo = now.minusMinutes(10);
+                
+                log.info("=== VERIFY CODE - CHECKING LOGIN FLOW ===");
+                log.info("User: {}", user.getEmail());
+                log.info("Token created at: {}", tokenCreated);
+                log.info("Current time: {}", now);
+                log.info("Ten minutes ago: {}", tenMinutesAgo);
+                
+                boolean shouldCompleteLogin = false;
+                if (tokenCreated != null) {
+                    boolean isRecent = tokenCreated.isAfter(tenMinutesAgo);
+                    long minutesAgo = java.time.Duration.between(tokenCreated, now).toMinutes();
+                    log.info("Token created {} minutes ago. Is recent (within 10 min): {}", minutesAgo, isRecent);
+                    
+                    if (isRecent) {
+                        shouldCompleteLogin = true;
+                        log.info("✓ Token was created recently - treating as login flow");
+                    }
+                } else {
+                    log.warn("Token creation time is null - cannot determine if this is login flow");
+                }
+                
+                if (shouldCompleteLogin) {
+                    // This was part of a login flow - complete login automatically
+                    // Password was already verified during login attempt, so we can generate token directly
+                    log.info("✓ Completing login automatically for user: {}", user.getEmail());
+                    
+                    // Generate JWT token directly since password was already verified
+                    String token = tokenProvider.generateToken(
+                            user.getEmail(),
+                            user.getId(),
+                            user.getRole().name()
+                    );
+                    
+                    user.setLastLogin(LocalDateTime.now());
+                    userRepository.save(user);
+                    
+                    response.put("token", token);
+                    response.put("userId", user.getId());
+                    response.put("role", user.getRole().name());
+                    response.put("firstName", user.getFirstName());
+                    response.put("lastName", user.getLastName());
+                    
+                    log.info("✓✓✓ LOGIN COMPLETED - Token generated and returned for user: {}", user.getEmail());
+                    log.info("Response contains token: {}", response.containsKey("token"));
+                } else {
+                    // This was registration verification, not login
+                    log.info("Email verified for registration - user {} can now log in manually", user.getEmail());
                 }
             }
             
@@ -429,6 +513,58 @@ public class AuthController {
             log.error("Code verification error: {}", e.getMessage());
             return ResponseEntity.badRequest()
                     .body(e.getMessage());
+        }
+    }
+    
+    /**
+     * Test email configuration endpoint (for debugging)
+     */
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmail(@RequestBody Map<String, String> request) {
+        try {
+            String testEmail = request.getOrDefault("email", "test@example.com");
+            String testCode = "123456";
+            
+            log.info("=== TEST EMAIL ENDPOINT CALLED ===");
+            log.info("Testing email configuration...");
+            log.info("Test recipient: {}", testEmail);
+            
+            // Check email service configuration
+            boolean isConfigured = emailService.isEmailConfigured();
+            log.info("Email service configured: {}", isConfigured);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("emailConfigured", isConfigured);
+            response.put("testRecipient", testEmail);
+            
+            if (isConfigured) {
+                try {
+                    // Use synchronous method for testing to catch exceptions immediately
+                    emailService.sendVerificationCodeSync(testEmail, "Test", testCode);
+                    response.put("status", "success");
+                    response.put("message", "Test email sent successfully. Please check inbox at " + testEmail);
+                    log.info("Test email sent successfully");
+                } catch (Exception e) {
+                    response.put("status", "error");
+                    response.put("message", "Failed to send test email: " + e.getMessage());
+                    response.put("errorType", e.getClass().getName());
+                    response.put("errorDetails", e.getMessage());
+                    if (e.getCause() != null) {
+                        response.put("cause", e.getCause().getMessage());
+                        response.put("causeType", e.getCause().getClass().getName());
+                    }
+                    log.error("Test email failed: {}", e.getMessage(), e);
+                }
+            } else {
+                response.put("status", "not_configured");
+                response.put("message", "Email service is not configured. Please check MAIL_USERNAME and MAIL_PASSWORD environment variables.");
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error in test email endpoint", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error testing email: " + e.getMessage());
         }
     }
     
@@ -465,12 +601,24 @@ public class AuthController {
             
             // Send verification code email
             boolean emailSent = false;
+            log.info(">>> CALLING EMAIL SERVICE FOR RESEND CODE <<<");
+            log.info("User email: {}", user.getEmail());
+            log.info("User first name: {}", user.getFirstName());
+            log.info("Verification code: {}", verificationCode);
             try {
-                emailService.sendVerificationCode(user.getEmail(), user.getFirstName(), verificationCode);
+                // Use synchronous method to catch exceptions immediately
+                emailService.sendVerificationCodeSync(user.getEmail(), user.getFirstName(), verificationCode);
                 emailSent = true;
-                log.info("Verification code resent to: {}", user.getEmail());
+                log.info("✓ Verification code resent successfully to: {}", user.getEmail());
             } catch (Exception e) {
-                log.error("Failed to send verification code to: {}", user.getEmail(), e);
+                log.error("✗ FAILED to resend verification code email to: {}", user.getEmail());
+                log.error("Exception Type: {}", e.getClass().getName());
+                log.error("Exception Message: {}", e.getMessage());
+                if (e.getCause() != null) {
+                    log.error("Cause: {}", e.getCause().getMessage());
+                    log.error("Cause Type: {}", e.getCause().getClass().getName());
+                }
+                log.error("Full stack trace:", e);
                 // Log the code for manual verification if email fails
                 log.warn("MANUAL VERIFICATION CODE for {}: {}", user.getEmail(), verificationCode);
                 // Don't fail - code is still saved, user can contact support or try again
@@ -715,6 +863,26 @@ public class AuthController {
             // Also set cookie for root path
             Cookie rootCookie = createSecureCookie("token", token, "/", 7 * 24 * 60 * 60);
             httpResponse.addCookie(rootCookie);
+            
+            // Fetch Facebook interests for recommendations (async, non-blocking)
+            try {
+                // Store values in final variables for lambda expression
+                final Long userId = user.getId();
+                final String accessToken = request.getAccessToken();
+                
+                // Fetch interests in background thread to avoid blocking login
+                new Thread(() -> {
+                    try {
+                        facebookInterestService.fetchAndStoreFacebookInterests(userId, accessToken);
+                        log.info("Successfully fetched Facebook interests for user {}", userId);
+                    } catch (Exception e) {
+                        log.warn("Could not fetch Facebook interests: {}", e.getMessage());
+                    }
+                }).start();
+            } catch (Exception e) {
+                log.warn("Could not initiate Facebook interest fetching: {}", e.getMessage());
+                // Don't fail login if interest fetching fails
+            }
             
             AuthResponse response = AuthResponse.builder()
                     .token(token)
