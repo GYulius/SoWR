@@ -12,7 +12,7 @@ import java.util.Locale;
 
 /**
  * Web MVC Configuration
- * Configures internationalization (i18n) support
+ * Configures internationalization (i18n) support and static resources
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {

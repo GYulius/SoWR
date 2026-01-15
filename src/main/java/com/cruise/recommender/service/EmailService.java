@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
@@ -26,7 +27,7 @@ public class EmailService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
     
-    @Value("${spring.mail.from:${spring.mail.username}}")
+    @Value("${spring.mail.from:cruisint@its-gilian.com}")
     private String fromAddress;
     
     @Value("${app.base-url:http://localhost:8080}")
@@ -38,6 +39,34 @@ public class EmailService {
     @Value("${app.name:Social Web Recommender}")
     private String appName;
     
+    @Value("${spring.mail.host:}")
+    private String smtpHost;
+    
+    @Value("${spring.mail.port:}")
+    private String smtpPort;
+    
+    /**
+     * Log email configuration at startup
+     */
+    @PostConstruct
+    public void logEmailConfiguration() {
+        log.info("=== EMAIL SERVICE CONFIGURATION (SMTP) ===");
+        log.info("SMTP Host: {}", smtpHost);
+        log.info("SMTP Port: {}", smtpPort);
+        log.info("SMTP Username: {}", fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "NOT CONFIGURED");
+        log.info("SMTP From Address: {}", fromAddress);
+        log.info("Email Service Configured: {}", isEmailConfigured());
+        log.info("JavaMailSender Bean: {}", mailSender != null ? "PRESENT (Using SMTP)" : "MISSING");
+        log.info("Email Method: JavaMailSender (SMTP) - NOT using default mail()");
+        if (isEmailConfigured()) {
+            log.info("From address matches username: {}", fromAddress.equals(fromEmail));
+            if (!fromAddress.equals(fromEmail)) {
+                log.warn("WARNING: From address ({}) does not match username ({}). Some SMTP servers require exact match!", fromAddress, fromEmail);
+            }
+        }
+        log.info("==========================================");
+    }
+    
     /**
      * Check if email service is configured
      */
@@ -46,25 +75,46 @@ public class EmailService {
     }
     
     /**
-     * Send verification code email
+     * Send verification code email synchronously (for testing - bypasses @Async)
      */
-    @Async
-    public void sendVerificationCode(String toEmail, String firstName, String verificationCode) {
+    public void sendVerificationCodeSync(String toEmail, String firstName, String verificationCode) {
+        log.info(">>> EMAIL SERVICE METHOD CALLED: sendVerificationCodeSync <<<");
+        log.info("Parameters - To: {}, FirstName: {}, Code: {}", toEmail, firstName, verificationCode);
+        log.info("Email configured check - fromEmail: {}", fromEmail);
+        
         // Check if email is configured
         if (fromEmail == null || fromEmail.isEmpty()) {
-            log.warn("Email service is not configured. Skipping verification code email to: {}. " +
+            log.error("Email service is not configured. Cannot send verification code email to: {}. " +
                     "Please configure MAIL_USERNAME and MAIL_PASSWORD environment variables.", toEmail);
             log.warn("Verification code for {}: {}", toEmail, verificationCode);
             throw new RuntimeException("Email service is not configured");
         }
         
+        String from = null;
         try {
-            log.info("Attempting to send verification code email to: {} from: {}", toEmail, fromEmail);
+            // Use from address - MUST match authenticated username exactly for SMTP
+            from = (fromAddress != null && !fromAddress.isEmpty()) ? fromAddress : 
+                         (fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "cruisint@its-gilian.com");
+            
+            // Verify from address matches username (required by most SMTP servers)
+            if (!from.equals(fromEmail) && fromEmail != null && !fromEmail.isEmpty()) {
+                log.warn("From address ({}) does not match SMTP username ({}). Using username as from address.", from, fromEmail);
+                from = fromEmail; // Use username as from address for SMTP authentication
+            }
+            
+            log.info("=== SYNC EMAIL SEND ATTEMPT (SMTP) ===");
+            log.info("SMTP Host: {}", smtpHost);
+            log.info("SMTP Port: {}", smtpPort);
+            log.info("SMTP Username: {}", fromEmail);
+            log.info("To: {}", toEmail);
+            log.info("From: {} (must match SMTP username)", from);
+            log.info("Subject: Your Verification Code - {}", appName);
+            log.info("Verification Code: {}", verificationCode);
+            log.info("Using: JavaMailSender (SMTP protocol)");
+            
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
-            // Use custom from address if configured, otherwise use username
-            String from = (fromAddress != null && !fromAddress.isEmpty()) ? fromAddress : fromEmail;
             helper.setFrom(from, appName);
             helper.setTo(toEmail);
             helper.setSubject("Your Verification Code - " + appName);
@@ -74,21 +124,118 @@ public class EmailService {
             
             helper.setText(htmlContent, true);
             
+            log.info("Sending email synchronously via JavaMailSender...");
             mailSender.send(message);
+            log.info("=== SYNC EMAIL SENT SUCCESSFULLY ===");
             log.info("Verification code email sent successfully to: {} from: {}", toEmail, from);
         } catch (MessagingException e) {
-            log.error("Failed to send verification code email to: {} from: {}. Error: {}", 
-                    toEmail, fromEmail, e.getMessage(), e);
-            log.error("SMTP Configuration - Host: {}, Port: {}, Username: {}", 
-                    System.getProperty("spring.mail.host"), 
-                    System.getProperty("spring.mail.port"), 
-                    fromEmail);
+            log.error("=== SYNC EMAIL SEND FAILED ===");
+            log.error("Failed to send verification code email to: {} from: {}", toEmail, from);
+            log.error("Error Type: {}", e.getClass().getName());
+            log.error("Error Message: {}", e.getMessage());
+            log.error("Error Cause: {}", e.getCause() != null ? e.getCause().getMessage() : "N/A");
+            if (e.getCause() != null) {
+                log.error("Cause Type: {}", e.getCause().getClass().getName());
+                e.getCause().printStackTrace();
+            }
+            log.error("Full Exception Stack Trace:", e);
             throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
         } catch (UnsupportedEncodingException e) {
             log.error("Encoding error when sending verification code email to: {}", toEmail, e);
             throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
         } catch (Exception e) {
+            log.error("=== UNEXPECTED SYNC EMAIL ERROR ===");
             log.error("Unexpected error when sending verification code email to: {}", toEmail, e);
+            log.error("Error Type: {}", e.getClass().getName());
+            log.error("Error Message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("Cause: {}", e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Send verification code email
+     */
+    @Async
+    public void sendVerificationCode(String toEmail, String firstName, String verificationCode) {
+        // Check if email is configured
+        if (fromEmail == null || fromEmail.isEmpty()) {
+            log.error("Email service is not configured. Cannot send verification code email to: {}. " +
+                    "Please configure MAIL_USERNAME and MAIL_PASSWORD environment variables.", toEmail);
+            log.warn("Verification code for {}: {}", toEmail, verificationCode);
+            throw new RuntimeException("Email service is not configured");
+        }
+        
+        String from = null;
+        try {
+            // Use from address - MUST match authenticated username exactly for SMTP
+            from = (fromAddress != null && !fromAddress.isEmpty()) ? fromAddress : 
+                         (fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "cruisint@its-gilian.com");
+            
+            // Verify from address matches username (required by most SMTP servers)
+            if (!from.equals(fromEmail) && fromEmail != null && !fromEmail.isEmpty()) {
+                log.warn("From address ({}) does not match SMTP username ({}). Using username as from address.", from, fromEmail);
+                from = fromEmail; // Use username as from address for SMTP authentication
+            }
+            
+            log.info("=== EMAIL SEND ATTEMPT (SMTP) ===");
+            log.info("SMTP Host: {}", smtpHost);
+            log.info("SMTP Port: {}", smtpPort);
+            log.info("SMTP Username: {}", fromEmail);
+            log.info("To: {}", toEmail);
+            log.info("From: {} (must match SMTP username)", from);
+            log.info("Subject: Your Verification Code - {}", appName);
+            log.info("Verification Code: {}", verificationCode);
+            log.info("Using: JavaMailSender (SMTP protocol)");
+            
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            
+            helper.setFrom(from, appName);
+            helper.setTo(toEmail);
+            helper.setSubject("Your Verification Code - " + appName);
+            
+            // Create HTML email content with verification code
+            String htmlContent = buildVerificationCodeEmailHtml(firstName, verificationCode);
+            
+            helper.setText(htmlContent, true);
+            
+            log.info("Sending email via JavaMailSender...");
+            mailSender.send(message);
+            log.info("=== EMAIL SENT SUCCESSFULLY ===");
+            log.info("Verification code email sent successfully to: {} from: {}", toEmail, from);
+        } catch (MessagingException e) {
+            log.error("=== EMAIL SEND FAILED ===");
+            log.error("Failed to send verification code email to: {} from: {}", toEmail, from);
+            log.error("Error Type: {}", e.getClass().getName());
+            log.error("Error Message: {}", e.getMessage());
+            log.error("Error Cause: {}", e.getCause() != null ? e.getCause().getMessage() : "N/A");
+            if (e.getCause() != null) {
+                log.error("Cause Type: {}", e.getCause().getClass().getName());
+                e.getCause().printStackTrace();
+            }
+            log.error("Full Exception Stack Trace:", e);
+            log.error("SMTP Configuration Check:");
+            log.error("  Host: {}", System.getProperty("spring.mail.host"));
+            log.error("  Port: {}", System.getProperty("spring.mail.port"));
+            log.error("  Username: {}", fromEmail);
+            log.error("  From Address: {}", from);
+            throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
+        } catch (UnsupportedEncodingException e) {
+            log.error("Encoding error when sending verification code email to: {}", toEmail, e);
+            throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("=== UNEXPECTED EMAIL ERROR ===");
+            log.error("Unexpected error when sending verification code email to: {}", toEmail, e);
+            log.error("Error Type: {}", e.getClass().getName());
+            log.error("Error Message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.error("Cause: {}", e.getCause().getMessage());
+            }
+            e.printStackTrace();
             throw new RuntimeException("Failed to send verification code email: " + e.getMessage(), e);
         }
     }
@@ -156,7 +303,17 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
-            helper.setFrom(fromEmail, appName);
+            // Use from address - MUST match authenticated username exactly for SMTP
+            String senderEmail = (fromAddress != null && !fromAddress.isEmpty()) ? fromAddress : 
+                                (fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "cruisint@its-gilian.com");
+            
+            // Verify from address matches username (required by most SMTP servers)
+            if (!senderEmail.equals(fromEmail) && fromEmail != null && !fromEmail.isEmpty()) {
+                log.warn("From address ({}) does not match SMTP username ({}). Using username as from address.", senderEmail, fromEmail);
+                senderEmail = fromEmail; // Use username as from address for SMTP authentication
+            }
+            
+            helper.setFrom(senderEmail, appName);
             helper.setTo(toEmail);
             helper.setSubject("Verify Your Email Address");
             

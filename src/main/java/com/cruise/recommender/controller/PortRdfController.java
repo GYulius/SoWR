@@ -1,6 +1,7 @@
 package com.cruise.recommender.controller;
 
 import com.cruise.recommender.service.PortRdfService;
+import com.cruise.recommender.service.PortRdfSyncService;
 import com.cruise.recommender.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class PortRdfController {
     
     private final PortRdfService portRdfService;
+    private final PortRdfSyncService portRdfSyncService;
     private final StatisticsService statisticsService;
     
     /**
@@ -207,6 +209,60 @@ public class PortRdfController {
             return sb.toString();
         } catch (Exception e) {
             return query.substring(0, Math.min(50, query.length()));
+        }
+    }
+    
+    /**
+     * Sync RDF data from cruise_kg dataset to MySQL ports table
+     * Populates: activities, excursions, general_interests, restaurants, meal_venues, culinary_ingredients
+     * POST /api/v1/rdf/ports/sync-to-mysql
+     */
+    @PostMapping("/sync-to-mysql")
+    public ResponseEntity<?> syncRdfToMysql() {
+        try {
+            log.info("Starting RDF to MySQL sync for all ports");
+            Map<String, Object> stats = portRdfSyncService.syncAllPortsFromRdf();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "RDF data synced to MySQL successfully");
+            response.put("statistics", stats);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error syncing RDF to MySQL", e);
+            String errorMessage = e.getMessage();
+            if (e.getCause() != null) {
+                errorMessage += " - Cause: " + e.getCause().getMessage();
+            }
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "error", errorMessage, "details", e.getClass().getSimpleName()));
+        }
+    }
+    
+    /**
+     * Sync RDF data for a single port to MySQL
+     * POST /api/v1/rdf/ports/sync-to-mysql/{portCode}
+     */
+    @PostMapping("/sync-to-mysql/{portCode}")
+    public ResponseEntity<?> syncPortFromRdf(@PathVariable String portCode) {
+        try {
+            log.info("Syncing port {} from RDF to MySQL", portCode);
+            boolean updated = portRdfSyncService.syncPortFromRdf(portCode);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("portCode", portCode);
+            response.put("updated", updated);
+            response.put("message", updated ? 
+                    "Port data synced successfully" : 
+                    "No RDF data found for this port or port not found");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error syncing port {} from RDF", portCode, e);
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "error", e.getMessage()));
         }
     }
 }

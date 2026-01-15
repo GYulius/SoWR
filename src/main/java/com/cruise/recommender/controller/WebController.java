@@ -132,6 +132,11 @@ public class WebController {
     
     @GetMapping("/health")
     public String health() {
+        return "health";
+    }
+    
+    @GetMapping("/health/json")
+    public String healthJson() {
         return "redirect:/actuator/health";
     }
     
