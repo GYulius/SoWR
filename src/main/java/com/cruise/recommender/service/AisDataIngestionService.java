@@ -1,6 +1,10 @@
 package com.cruise.recommender.service;
 
 import com.cruise.recommender.config.RabbitMQConfig;
+import com.cruise.recommender.entity.CruiseShip;
+import com.cruise.recommender.entity.Port;
+import com.cruise.recommender.repository.CruiseShipRepository;
+import com.cruise.recommender.repository.PortRepository;
 import com.cruise.recommender.service.AisDataService.AisDataMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +33,9 @@ public class AisDataIngestionService {
     
     private final RabbitTemplate rabbitTemplate;
     private final RestTemplate restTemplate = new RestTemplate();
-    private final OpenAisApiClient openAisApiClient;
+    private final VesselFinderApiClient vesselFinderApiClient;
+    private final CruiseShipRepository cruiseShipRepository;
+    private final PortRepository portRepository;
     
     @Value("${ais.data.source.api.url:}")
     private String aisApiUrl;
@@ -54,6 +60,7 @@ public class AisDataIngestionService {
     /**
      * Scheduled task to fetch AIS data from external sources
      * Runs every 30 seconds by default
+     * Also generates historical waypoints for route calculation
      */
     @Scheduled(fixedRateString = "${ais.data.ingestion.interval:30000}")
     public void ingestAisData() {
@@ -63,16 +70,21 @@ public class AisDataIngestionService {
             List<AisDataMessage> aisDataList = new ArrayList<>();
             
             if (simulationEnabled) {
-                // Generate simulated AIS data for testing
+                // Generate simulated AIS data for testing (includes current position)
                 aisDataList = generateSimulatedAisData();
+                
+                // Generate historical waypoints for route calculation
+                // This creates a trail of positions showing ship movement towards port
+                List<AisDataMessage> historicalWaypoints = generateHistoricalWaypoints();
+                aisDataList.addAll(historicalWaypoints);
             } else if (aisApiUrl != null && !aisApiUrl.isEmpty() && aisApiKey != null && !aisApiKey.isEmpty()) {
                 // Fetch from external API (VesselFinder, MarineTraffic, etc.) - Priority 1
                 log.debug("Fetching AIS data from {} API", aisProvider);
                 aisDataList = fetchFromExternalApi();
-            } else if (openAisEnabled) {
-                // Fetch from Open-AIS (requires GitLab repository access - disabled by default) - Priority 2
-                log.debug("Fetching AIS data from Open-AIS");
-                aisDataList = openAisApiClient.fetchAisData();
+            } else if (aisApiUrl != null && !aisApiUrl.isEmpty() && aisApiKey != null && !aisApiKey.isEmpty()) {
+                // Fetch from VesselFinder API (default provider) - Priority 2
+                log.debug("Fetching AIS data from VesselFinder");
+                aisDataList = vesselFinderApiClient.fetchAisData();
             } else {
                 log.warn("No AIS data source configured. Configure VesselFinder API (url and key), enable simulation, or enable Open-AIS.");
                 return;
@@ -297,107 +309,195 @@ public class AisDataIngestionService {
     
     /**
      * Generate simulated AIS data for testing and development
+     * Uses real ships from cruise_ships table with MMSI, IMO, and callSign
+     * Generates positions based on routes to actual ports for route calculation
      */
     private List<AisDataMessage> generateSimulatedAisData() {
         List<AisDataMessage> aisDataList = new ArrayList<>();
         
-        // Simulate 3-5 ships
-        int shipCount = 3 + random.nextInt(3);
-        
-        // Sample cruise ship MMSIs and names
-        String[] shipNames = {
-            "Royal Caribbean Harmony", "MSC Grandiosa", "Carnival Vista",
-            "Norwegian Escape", "Celebrity Edge", "Princess Regal"
-        };
-        
-        String[] mmsis = {
-            "311000123", "247041200", "310627000",
-            "311000456", "247041300", "310627100"
-        };
-        
-        // Sample port locations (Miami, Barcelona, Venice, etc.)
-        double[][] portLocations = {
-            {25.7617, -80.1918}, // Miami
-            {41.3851, 2.1734},   // Barcelona
-            {45.4408, 12.3155},  // Venice
-            {40.7128, -74.0060}, // New York
-            {33.7490, -84.3880}  // Atlanta (inland example)
-        };
-        
-        for (int i = 0; i < shipCount; i++) {
-            int shipIndex = i % shipNames.length;
-            int portIndex = random.nextInt(portLocations.length);
+        try {
+            // Get all cruise ships with AIS enabled from database
+            List<CruiseShip> allShips = cruiseShipRepository.findByAisEnabledTrue();
             
-            // Generate position near a port (within 50 nautical miles)
-            double baseLat = portLocations[portIndex][0];
-            double baseLng = portLocations[portIndex][1];
+            // Filter to only ships with valid MMSI
+            List<CruiseShip> ships = allShips.stream()
+                .filter(ship -> ship.getMmsi() != null && !ship.getMmsi().trim().isEmpty())
+                .collect(java.util.stream.Collectors.toList());
             
-            // Add random offset (approximately 0.5-1.0 degrees = 30-60 nautical miles)
-            double latOffset = (random.nextDouble() - 0.5) * 1.0;
-            double lngOffset = (random.nextDouble() - 0.5) * 1.0;
-            
-            double latitude = baseLat + latOffset;
-            double longitude = baseLng + lngOffset;
-            
-            // Generate realistic speed (cruise ships typically 15-25 knots)
-            double speed = 15 + random.nextDouble() * 10;
-            
-            // Generate course (0-360 degrees)
-            double course = random.nextDouble() * 360;
-            
-            // Ensure shipIndex is within bounds for mmsis array
-            int mmsiIndex = shipIndex % mmsis.length;
-            String mmsi = mmsis[mmsiIndex];
-            
-            // Validate MMSI before building message
-            if (mmsi == null || mmsi.trim().isEmpty()) {
-                log.warn("Skipping ship {}: MMSI is null or empty", shipNames[shipIndex]);
-                continue;
+            if (ships.isEmpty()) {
+                log.warn("No cruise ships with AIS enabled and valid MMSI found in database. Cannot generate simulated AIS data.");
+                if (!allShips.isEmpty()) {
+                    log.warn("Found {} ships with AIS enabled but missing MMSI. Please update ships with MMSI values.", 
+                            allShips.size() - ships.size());
+                }
+                return aisDataList;
             }
             
-            // Ensure MMSI is valid before building
-            String validMmsi = mmsi.trim();
-            if (validMmsi.isEmpty() || "null".equalsIgnoreCase(validMmsi)) {
-                log.warn("Skipping ship {}: Invalid MMSI '{}'", shipNames[shipIndex], mmsi);
-                continue;
+            // Get random ports from database for route destinations
+            List<Port> ports = portRepository.findAll();
+            if (ports.isEmpty()) {
+                log.warn("No ports found in database. Cannot generate realistic routes.");
+                return aisDataList;
             }
             
-            AisDataMessage message = AisDataMessage.builder()
-                .mmsi(validMmsi)
-                .shipName(shipNames[shipIndex])
-                .latitude(latitude)
-                .longitude(longitude)
-                .timestamp(LocalDateTime.now())
-                .speed(speed)
-                .course(course)
-                .heading((int) course)
-                .shipType("Passenger Ship")
-                .destination(getRandomDestination())
-                .eta(LocalDateTime.now().plusHours(2 + random.nextInt(24)).toString())
-                .imo("IMO" + (9000000 + random.nextInt(1000000)))
-                .callSign("CALL" + random.nextInt(1000))
-                .stationRange(5 + random.nextDouble() * 20)
-                .signalQuality(getRandomSignalQuality())
-                .dataSource("SIMULATION")
-                .build();
-            
-            // Double-check MMSI is set after building - this should never happen if builder works correctly
-            if (message.getMmsi() == null || message.getMmsi().trim().isEmpty()) {
-                log.error("CRITICAL: MMSI is null after building message for ship: {}. This indicates a builder issue.", shipNames[shipIndex]);
-                continue;
+            // Select 3-5 ships randomly (or all if less than 5)
+            int shipCount = Math.min(3 + random.nextInt(3), ships.size());
+            List<CruiseShip> selectedShips = new ArrayList<>();
+            for (int i = 0; i < shipCount; i++) {
+                int index = random.nextInt(ships.size());
+                CruiseShip ship = ships.get(index);
+                if (!selectedShips.contains(ship)) {
+                    selectedShips.add(ship);
+                } else if (ships.size() > selectedShips.size()) {
+                    // Try another ship if already selected
+                    i--;
+                }
             }
             
-            // Validate the entire message before adding
-            if (message.getShipName() == null || message.getLatitude() == null || message.getLongitude() == null) {
-                log.warn("Skipping incomplete message for ship: {}", shipNames[shipIndex]);
-                continue;
+            // Generate AIS data for each selected ship
+            for (CruiseShip ship : selectedShips) {
+                // Double-check MMSI is valid (should already be filtered, but safety check)
+                String shipMmsi = ship.getMmsi() != null ? ship.getMmsi().trim() : null;
+                if (shipMmsi == null || shipMmsi.isEmpty()) {
+                    log.warn("Skipping ship {} (ID: {}): MMSI is null or empty", ship.getName(), ship.getId());
+                    continue;
+                }
+                
+                // Select a random port as destination
+                Port destinationPort = ports.get(random.nextInt(ports.size()));
+                
+                // Get ship's current position or generate starting position
+                double startLat, startLng;
+                if (ship.getCurrentLatitude() != null && ship.getCurrentLongitude() != null) {
+                    // Use existing position
+                    startLat = ship.getCurrentLatitude();
+                    startLng = ship.getCurrentLongitude();
+                } else {
+                    // Generate starting position (50-100 nautical miles from destination)
+                    double distanceNm = 50 + random.nextDouble() * 50; // 50-100 nm
+                    double bearing = random.nextDouble() * 360; // Random bearing
+                    double[] startPos = calculatePosition(destinationPort.getLatitude(), 
+                                                          destinationPort.getLongitude(), 
+                                                          distanceNm, bearing);
+                    startLat = startPos[0];
+                    startLng = startPos[1];
+                }
+                
+                // Calculate course and heading towards destination port
+                double course = calculateBearing(startLat, startLng, 
+                                                destinationPort.getLatitude(), 
+                                                destinationPort.getLongitude());
+                
+                // Calculate distance to port
+                double distanceNm = calculateDistance(startLat, startLng,
+                                                      destinationPort.getLatitude(),
+                                                      destinationPort.getLongitude());
+                
+                // Generate realistic speed (cruise ships typically 15-25 knots)
+                double speed = 15 + random.nextDouble() * 10;
+                
+                // Calculate ETA based on distance and speed
+                double hoursToPort = distanceNm / speed;
+                LocalDateTime eta = LocalDateTime.now().plusHours((long) hoursToPort)
+                                                  .plusMinutes((long) ((hoursToPort % 1) * 60));
+                
+                // Build AIS message with real ship data
+                AisDataMessage message = AisDataMessage.builder()
+                    .mmsi(shipMmsi)
+                    .shipName(ship.getName())
+                    .latitude(startLat)
+                    .longitude(startLng)
+                    .timestamp(LocalDateTime.now())
+                    .speed(speed)
+                    .course(course)
+                    .heading((int) Math.round(course))
+                    .shipType("Passenger Ship")
+                    .destination(destinationPort.getName() + ", " + destinationPort.getCountry())
+                    .eta(eta.toString())
+                    .imo(ship.getImo() != null && !ship.getImo().trim().isEmpty() ? ship.getImo().trim() : null)
+                    .callSign(ship.getCallSign() != null && !ship.getCallSign().trim().isEmpty() ? ship.getCallSign().trim() : null)
+                    .stationRange(5 + random.nextDouble() * 20)
+                    .signalQuality(getRandomSignalQuality())
+                    .dataSource("SIMULATION")
+                    .build();
+                
+                // Final validation before adding
+                if (message.getMmsi() == null || message.getMmsi().trim().isEmpty()) {
+                    log.error("CRITICAL: MMSI is null after building message for ship: {}", ship.getName());
+                    continue;
+                }
+                
+                aisDataList.add(message);
+                log.debug("Generated simulated AIS data for MMSI: {}, Ship: {}, Destination: {} ({} nm away)", 
+                         message.getMmsi(), message.getShipName(), destinationPort.getName(), 
+                         String.format("%.2f", distanceNm));
             }
             
-            aisDataList.add(message);
-            log.debug("Generated simulated AIS data for MMSI: {}, Ship: {}", message.getMmsi(), message.getShipName());
+            log.info("Generated {} simulated AIS data messages from {} ships", aisDataList.size(), selectedShips.size());
+            
+        } catch (Exception e) {
+            log.error("Error generating simulated AIS data", e);
         }
         
         return aisDataList;
+    }
+    
+    /**
+     * Calculate position given starting point, distance (nautical miles), and bearing (degrees)
+     */
+    private double[] calculatePosition(double startLat, double startLng, double distanceNm, double bearingDeg) {
+        double distanceKm = distanceNm * 1.852; // Convert to km
+        double distanceRad = distanceKm / 6371.0; // Earth radius in km
+        double bearingRad = Math.toRadians(bearingDeg);
+        
+        double lat1Rad = Math.toRadians(startLat);
+        double lng1Rad = Math.toRadians(startLng);
+        
+        double lat2Rad = Math.asin(Math.sin(lat1Rad) * Math.cos(distanceRad) +
+                                   Math.cos(lat1Rad) * Math.sin(distanceRad) * Math.cos(bearingRad));
+        double lng2Rad = lng1Rad + Math.atan2(Math.sin(bearingRad) * Math.sin(distanceRad) * Math.cos(lat1Rad),
+                                             Math.cos(distanceRad) - Math.sin(lat1Rad) * Math.sin(lat2Rad));
+        
+        return new double[]{Math.toDegrees(lat2Rad), Math.toDegrees(lng2Rad)};
+    }
+    
+    /**
+     * Calculate bearing (course) from point A to point B in degrees
+     */
+    private double calculateBearing(double lat1, double lng1, double lat2, double lng2) {
+        double lat1Rad = Math.toRadians(lat1);
+        double lat2Rad = Math.toRadians(lat2);
+        double deltaLng = Math.toRadians(lng2 - lng1);
+        
+        double y = Math.sin(deltaLng) * Math.cos(lat2Rad);
+        double x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+                   Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(deltaLng);
+        
+        double bearingRad = Math.atan2(y, x);
+        double bearingDeg = Math.toDegrees(bearingRad);
+        
+        // Normalize to 0-360
+        return (bearingDeg + 360) % 360;
+    }
+    
+    /**
+     * Calculate distance between two points in nautical miles using Haversine formula
+     */
+    private double calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+        double earthRadiusKm = 6371.0;
+        double earthRadiusNm = earthRadiusKm / 1.852; // Convert to nautical miles
+        
+        double lat1Rad = Math.toRadians(lat1);
+        double lat2Rad = Math.toRadians(lat2);
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLng = Math.toRadians(lng2 - lng1);
+        
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                   Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                   Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return earthRadiusNm * c;
     }
     
     private String getRandomDestination() {
@@ -406,6 +506,118 @@ public class AisDataIngestionService {
             "New York, NY", "Los Angeles, CA", "Rome, Italy"
         };
         return destinations[random.nextInt(destinations.length)];
+    }
+    
+    /**
+     * Generate historical waypoints for ships to enable route calculation
+     * Creates a trail of positions showing ship movement over the last few hours
+     */
+    private List<AisDataMessage> generateHistoricalWaypoints() {
+        List<AisDataMessage> waypoints = new ArrayList<>();
+        
+        try {
+            // Get ships with recent AIS data
+            List<CruiseShip> ships = cruiseShipRepository.findByAisEnabledTrue();
+            
+            for (CruiseShip ship : ships) {
+                // Validate ship has required identifiers
+                if (ship.getMmsi() == null || ship.getMmsi().trim().isEmpty()) {
+                    log.debug("Skipping ship {} (ID: {}): MMSI is null or empty for historical waypoints", 
+                             ship.getName(), ship.getId());
+                    continue;
+                }
+                
+                // Only generate waypoints if ship has current position
+                if (ship.getCurrentLatitude() == null || ship.getCurrentLongitude() == null) {
+                    continue;
+                }
+                
+                // Get ports for potential destinations
+                List<Port> ports = portRepository.findAll();
+                if (ports.isEmpty()) {
+                    continue;
+                }
+                
+                // Find nearest port (or use a random one)
+                Port nearestPort = ports.get(random.nextInt(ports.size()));
+                double distanceToPort = calculateDistance(
+                    ship.getCurrentLatitude(), ship.getCurrentLongitude(),
+                    nearestPort.getLatitude(), nearestPort.getLongitude()
+                );
+                
+                // Only generate waypoints if ship is within 200 nm of a port
+                if (distanceToPort > 200) {
+                    continue;
+                }
+                
+                // Generate 3-5 historical waypoints over the last 2-4 hours
+                int waypointCount = 3 + random.nextInt(3);
+                double hoursBack = 2 + random.nextDouble() * 2; // 2-4 hours ago
+                
+                for (int i = 0; i < waypointCount; i++) {
+                    // Calculate position further from port (historical position)
+                    double hoursAgo = hoursBack - (i * (hoursBack / waypointCount));
+                    double historicalDistance = distanceToPort + (waypointCount - i) * 5; // 5nm per waypoint
+                    
+                    // Calculate bearing to port
+                    double bearingToPort = calculateBearing(
+                        ship.getCurrentLatitude(), ship.getCurrentLongitude(),
+                        nearestPort.getLatitude(), nearestPort.getLongitude()
+                    );
+                    
+                    // Calculate historical position (further from port)
+                    double[] historicalPos = calculatePosition(
+                        nearestPort.getLatitude(), nearestPort.getLongitude(),
+                        historicalDistance, bearingToPort + 180 // Opposite direction
+                    );
+                    
+                    // Calculate speed based on distance covered
+                    double speed = 15 + random.nextDouble() * 10;
+                    
+                    // Validate MMSI before building waypoint
+                    String shipMmsi = ship.getMmsi() != null ? ship.getMmsi().trim() : null;
+                    if (shipMmsi == null || shipMmsi.isEmpty()) {
+                        log.warn("Skipping historical waypoint for ship {}: MMSI is null or empty", ship.getName());
+                        continue;
+                    }
+                    
+                    // Build historical waypoint
+                    AisDataMessage waypoint = AisDataMessage.builder()
+                        .mmsi(shipMmsi)
+                        .shipName(ship.getName())
+                        .latitude(historicalPos[0])
+                        .longitude(historicalPos[1])
+                        .timestamp(LocalDateTime.now().minusHours((long) hoursAgo)
+                                              .minusMinutes((long) ((hoursAgo % 1) * 60)))
+                        .speed(speed)
+                        .course(bearingToPort)
+                        .heading((int) Math.round(bearingToPort))
+                        .shipType("Passenger Ship")
+                        .destination(nearestPort.getName() + ", " + nearestPort.getCountry())
+                        .imo(ship.getImo() != null ? ship.getImo().trim() : null)
+                        .callSign(ship.getCallSign() != null ? ship.getCallSign().trim() : null)
+                        .stationRange(5 + random.nextDouble() * 20)
+                        .signalQuality(getRandomSignalQuality())
+                        .dataSource("SIMULATION_HISTORICAL")
+                        .build();
+                    
+                    // Double-check MMSI is set
+                    if (waypoint.getMmsi() == null || waypoint.getMmsi().trim().isEmpty()) {
+                        log.error("CRITICAL: Historical waypoint MMSI is null after building for ship: {}", ship.getName());
+                        continue;
+                    }
+                    
+                    waypoints.add(waypoint);
+                }
+            }
+            
+            log.debug("Generated {} historical waypoints for route calculation", waypoints.size());
+            
+        } catch (Exception e) {
+            log.error("Error generating historical waypoints", e);
+        }
+        
+        return waypoints;
     }
     
     private String getRandomSignalQuality() {

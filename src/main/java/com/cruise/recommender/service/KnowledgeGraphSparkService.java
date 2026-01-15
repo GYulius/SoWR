@@ -7,7 +7,9 @@ import org.apache.jena.rdf.model.*;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.sparql.core.DatasetImpl;
-import org.apache.jena.tdb.TDBFactory;
+import org.apache.jena.tdb2.TDB2Factory;
+import org.apache.jena.dboe.base.file.Location;
+import org.apache.jena.system.Txn;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,6 +37,7 @@ public class KnowledgeGraphSparkService {
     private volatile Object javaSparkContext;
     private volatile Model rdfModel;
     private volatile org.apache.jena.query.Dataset jenaDataset; // Jena Dataset, not Spark Dataset
+    private volatile org.apache.jena.query.Dataset tdbDataset; // TDB2 Dataset for transaction management
     private volatile boolean sparkAvailable = false;
     private final Object initializationLock = new Object();
     
@@ -55,16 +58,26 @@ public class KnowledgeGraphSparkService {
             synchronized (initializationLock) {
                 if (rdfModel == null) {
                     try {
-                        // Initialize Jena TDB dataset for persistent RDF storage
-                        org.apache.jena.query.Dataset tdbDataset = TDBFactory.createDataset(rdfStoragePath);
+                        // Suppress StAX property warnings by setting system property
+                        // These warnings occur in newer Java versions but don't affect functionality
+                        System.setProperty("javax.xml.accessExternalDTD", "all");
+                        System.setProperty("javax.xml.accessExternalSchema", "all");
+                        System.setProperty("javax.xml.accessExternalStylesheet", "all");
+                        
+                        // Initialize Jena TDB2 dataset for persistent RDF storage
+                        // Connect to existing TDB2 dataset at the specified location
+                        Location location = Location.create(rdfStoragePath);
+                        tdbDataset = org.apache.jena.tdb2.TDB2Factory.connectDataset(location);
                         rdfModel = tdbDataset.getDefaultModel();
                         
-                        // Set up namespace prefixes
-                        rdfModel.setNsPrefix("cruise", namespace);
-                        rdfModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-                        rdfModel.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-                        rdfModel.setNsPrefix("owl", "http://www.w3.org/2002/07/owl#");
-                        rdfModel.setNsPrefix("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
+                        // Set up namespace prefixes - TDB2 requires write transaction for prefix operations
+                        Txn.executeWrite(tdbDataset, () -> {
+                            rdfModel.setNsPrefix("cruise", namespace);
+                            rdfModel.setNsPrefix("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+                            rdfModel.setNsPrefix("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
+                            rdfModel.setNsPrefix("owl", "http://www.w3.org/2002/07/owl#");
+                            rdfModel.setNsPrefix("geo", "http://www.w3.org/2003/01/geo/wgs84_pos#");
+                        });
                         
                         jenaDataset = new DatasetImpl(rdfModel);
                         
@@ -170,44 +183,76 @@ public class KnowledgeGraphSparkService {
         
         initialize();
         
-        // Skip if RDF model is not initialized
-        if (rdfModel == null) {
-            log.warn("RDF model not initialized, skipping AIS data processing");
+        // Skip if RDF model or TDB dataset is not initialized
+        if (rdfModel == null || tdbDataset == null) {
+            log.warn("RDF model or TDB dataset not initialized, skipping AIS data processing");
             return;
         }
         
-        try {
-            // Convert AIS data message to RDF triples
-            String shipUri = namespace + "ship/" + message.getMmsi();
-            Resource ship = rdfModel.createResource(shipUri);
-            
-            // Add ship properties
-            ship.addProperty(rdfModel.createProperty(namespace + "hasMMSI"), 
-                rdfModel.createLiteral(message.getMmsi() != null ? message.getMmsi() : ""));
-            ship.addProperty(rdfModel.createProperty(namespace + "hasName"), 
-                rdfModel.createLiteral(message.getShipName() != null ? message.getShipName() : "Unknown"));
-            
-            // Add location as geo:Point
-            if (message.getLatitude() != null && message.getLongitude() != null) {
-                Resource location = rdfModel.createResource();
-                location.addProperty(rdfModel.createProperty("geo:lat"), 
-                    rdfModel.createLiteral(String.valueOf(message.getLatitude())));
-                location.addProperty(rdfModel.createProperty("geo:long"), 
-                    rdfModel.createLiteral(String.valueOf(message.getLongitude())));
-                ship.addProperty(rdfModel.createProperty(namespace + "hasLocation"), location);
+        // TDB2 requires explicit write transactions
+        Txn.executeWrite(tdbDataset, () -> {
+            try {
+                // Convert AIS data message to RDF triples
+                String shipUri = namespace + "ship/" + message.getMmsi();
+                Resource ship = rdfModel.createResource(shipUri);
+                
+                // Add ship properties
+                ship.addProperty(rdfModel.createProperty(namespace + "hasMMSI"), 
+                    rdfModel.createLiteral(message.getMmsi() != null ? message.getMmsi() : ""));
+                ship.addProperty(rdfModel.createProperty(namespace + "hasName"), 
+                    rdfModel.createLiteral(message.getShipName() != null ? message.getShipName() : "Unknown"));
+                
+                // Add IMO if available
+                if (message.getImo() != null && !message.getImo().trim().isEmpty()) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasIMO"), 
+                        rdfModel.createLiteral(message.getImo()));
+                }
+                
+                // Add callSign if available
+                if (message.getCallSign() != null && !message.getCallSign().trim().isEmpty()) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasCallSign"), 
+                        rdfModel.createLiteral(message.getCallSign()));
+                }
+                
+                // Add location as geo:Point
+                if (message.getLatitude() != null && message.getLongitude() != null) {
+                    Resource location = rdfModel.createResource();
+                    location.addProperty(rdfModel.createProperty("geo:lat"), 
+                        rdfModel.createLiteral(String.valueOf(message.getLatitude())));
+                    location.addProperty(rdfModel.createProperty("geo:long"), 
+                        rdfModel.createLiteral(String.valueOf(message.getLongitude())));
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasLocation"), location);
+                }
+                
+                // Add speed and course
+                if (message.getSpeed() != null) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasSpeed"), 
+                        rdfModel.createLiteral(String.valueOf(message.getSpeed())));
+                }
+                if (message.getCourse() != null) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasCourse"), 
+                        rdfModel.createLiteral(String.valueOf(message.getCourse())));
+                }
+                
+                // Add timestamp
+                if (message.getTimestamp() != null) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasTimestamp"), 
+                        rdfModel.createLiteral(message.getTimestamp().toString()));
+                }
+                
+                // Add destination if available
+                if (message.getDestination() != null && !message.getDestination().trim().isEmpty()) {
+                    ship.addProperty(rdfModel.createProperty(namespace + "hasDestination"), 
+                        rdfModel.createLiteral(message.getDestination()));
+                }
+                
+                log.debug("Added AIS data to RDF model for ship: {}", message.getMmsi());
+                
+            } catch (Exception e) {
+                log.error("Error processing AIS data to RDF within transaction", e);
+                throw new RuntimeException("Failed to process AIS data to RDF", e);
             }
-            
-            // Add timestamp
-            if (message.getTimestamp() != null) {
-                ship.addProperty(rdfModel.createProperty(namespace + "hasTimestamp"), 
-                    rdfModel.createLiteral(message.getTimestamp().toString()));
-            }
-            
-            log.debug("Added AIS data to RDF model for ship: {}", message.getMmsi());
-            
-        } catch (Exception e) {
-            log.error("Error processing AIS data to RDF", e);
-        }
+        });
     }
     
     /**
@@ -219,56 +264,60 @@ public class KnowledgeGraphSparkService {
         
         initialize();
         
-        // Skip if RDF model is not initialized
-        if (rdfModel == null) {
-            log.warn("RDF model not initialized, skipping social media processing");
+        // Skip if RDF model or TDB dataset is not initialized
+        if (rdfModel == null || tdbDataset == null) {
+            log.warn("RDF model or TDB dataset not initialized, skipping social media processing");
             return;
         }
         
-        try {
-            // Convert social media post to RDF triples
-            if (socialMediaPost instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> post = (Map<String, Object>) socialMediaPost;
-                
-                String postUri = namespace + "post/" + post.get("postId");
-                Resource postResource = rdfModel.createResource(postUri);
-                
-                // Add post properties
-                postResource.addProperty(rdfModel.createProperty(namespace + "hasPlatform"), 
-                    rdfModel.createLiteral(String.valueOf(post.get("platform"))));
-                postResource.addProperty(rdfModel.createProperty(namespace + "hasAuthor"), 
-                    rdfModel.createLiteral(String.valueOf(post.get("authorId"))));
-                postResource.addProperty(rdfModel.createProperty(namespace + "hasContent"), 
-                    rdfModel.createLiteral(String.valueOf(post.get("content"))));
-                
-                // Add location if available
-                if (post.get("location") != null) {
-                    postResource.addProperty(rdfModel.createProperty(namespace + "hasLocation"), 
-                        rdfModel.createLiteral(String.valueOf(post.get("location"))));
-                }
-                
-                // Add keywords as RDF properties
-                if (post.get("keywords") instanceof List) {
+        // TDB2 requires explicit write transactions
+        Txn.executeWrite(tdbDataset, () -> {
+            try {
+                // Convert social media post to RDF triples
+                if (socialMediaPost instanceof Map) {
                     @SuppressWarnings("unchecked")
-                    List<String> keywords = (List<String>) post.get("keywords");
-                    for (String keyword : keywords) {
-                        postResource.addProperty(rdfModel.createProperty(namespace + "hasKeyword"), 
-                            rdfModel.createLiteral(keyword));
+                    Map<String, Object> post = (Map<String, Object>) socialMediaPost;
+                    
+                    String postUri = namespace + "post/" + post.get("postId");
+                    Resource postResource = rdfModel.createResource(postUri);
+                    
+                    // Add post properties
+                    postResource.addProperty(rdfModel.createProperty(namespace + "hasPlatform"), 
+                        rdfModel.createLiteral(String.valueOf(post.get("platform"))));
+                    postResource.addProperty(rdfModel.createProperty(namespace + "hasAuthor"), 
+                        rdfModel.createLiteral(String.valueOf(post.get("authorId"))));
+                    postResource.addProperty(rdfModel.createProperty(namespace + "hasContent"), 
+                        rdfModel.createLiteral(String.valueOf(post.get("content"))));
+                    
+                    // Add location if available
+                    if (post.get("location") != null) {
+                        postResource.addProperty(rdfModel.createProperty(namespace + "hasLocation"), 
+                            rdfModel.createLiteral(String.valueOf(post.get("location"))));
                     }
+                    
+                    // Add keywords as RDF properties
+                    if (post.get("keywords") instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<String> keywords = (List<String>) post.get("keywords");
+                        for (String keyword : keywords) {
+                            postResource.addProperty(rdfModel.createProperty(namespace + "hasKeyword"), 
+                                rdfModel.createLiteral(keyword));
+                        }
+                    }
+                    
+                    // Link to passenger interest
+                    String passengerUri = namespace + "passenger/" + post.get("authorId");
+                    Resource passenger = rdfModel.createResource(passengerUri);
+                    passenger.addProperty(rdfModel.createProperty(namespace + "hasInterest"), postResource);
+                    
+                    log.debug("Added social media post to RDF model: {}", post.get("postId"));
                 }
                 
-                // Link to passenger interest
-                String passengerUri = namespace + "passenger/" + post.get("authorId");
-                Resource passenger = rdfModel.createResource(passengerUri);
-                passenger.addProperty(rdfModel.createProperty(namespace + "hasInterest"), postResource);
-                
-                log.debug("Added social media post to RDF model: {}", post.get("postId"));
+            } catch (Exception e) {
+                log.error("Error processing social media data to RDF within transaction", e);
+                throw new RuntimeException("Failed to process social media data to RDF", e);
             }
-            
-        } catch (Exception e) {
-            log.error("Error processing social media data to RDF", e);
-        }
+        });
     }
     
     /**

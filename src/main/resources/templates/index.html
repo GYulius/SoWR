@@ -39,14 +39,14 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#foodie" th:text="#{nav.foodie}">Foodie</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item" id="featuresNavItem" style="display: none;">
                         <a class="nav-link" href="#features" th:text="#{nav.features}">Features</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item" id="apiDocsNavItem" style="display: none;">
                         <a class="nav-link" th:href="@{/swagger-ui.html}" href="/api/v1/swagger-ui.html" target="_blank" th:text="#{nav.apiDocs}">API Docs</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" th:href="@{/actuator/health}" href="/api/v1/actuator/health" target="_blank" th:text="#{nav.health}">Health</a>
+                    </li>
+                    <li class="nav-item" id="healthNavItem" style="display: none;">
+                        <a class="nav-link" th:href="@{/health}" href="/api/v1/health" target="_blank" th:text="#{nav.health}">Health</a>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -251,12 +251,26 @@
                 </div>
             </div>
             
+            <!-- Passenger Ship and Approaching Port Info -->
+            <div class="row mb-4" id="passengerShipInfoRow" style="display: none;">
+                <div class="col-12">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <p class="mb-0" id="passengerShipInfoText">
+                                <!-- Will be populated by JavaScript -->
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Select Other Port -->
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-body">
                             <label for="userPortSelect" class="form-label fw-bold">
-                                <i class="fas fa-map-marker-alt me-2"></i>Select a Port for Recommendations:
+                                <i class="fas fa-map-marker-alt me-2"></i>Select any other Port for Recommendations according to your interests:
                             </label>
                             <select id="userPortSelect" class="form-select form-select-lg">
                                 <option value="">-- Select a Port --</option>
@@ -550,8 +564,8 @@
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features" class="py-5">
+    <!-- Features Section (Admin Only) -->
+    <section id="features" class="py-5" style="display: none;">
         <div class="container">
             <div class="row text-center mb-5">
                 <div class="col-12">
@@ -636,8 +650,8 @@
         </div>
     </section>
 
-    <!-- Stats Section -->
-    <section class="stats-section">
+    <!-- Stats Section (Admin Only) -->
+    <section id="statsSection" class="stats-section" style="display: none;">
         <div class="container">
             <div class="row text-center">
                 <div class="col-md-3">
@@ -672,8 +686,8 @@
         </div>
     </section>
 
-    <!-- Technology Stack -->
-    <section class="py-5 bg-light">
+    <!-- Technology Stack (Admin Only) -->
+    <section id="techStackSection" class="py-5 bg-light" style="display: none;">
         <div class="container">
             <div class="row text-center mb-5">
                 <div class="col-12">
@@ -717,7 +731,14 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="loginErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                    <div id="loginErrorMessage" class="alert alert-danger" style="display: none;">
+                        <div id="loginErrorText"></div>
+                        <div id="loginResendCodeSection" style="display: none; margin-top: 10px;">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="loginResendCodeBtn" onclick="resendCodeFromLogin()">
+                                <i class="fas fa-redo me-2"></i>Resend Verification Code
+                            </button>
+                        </div>
+                    </div>
                     
                     <form id="loginModalForm">
                         <div class="mb-3">
@@ -837,6 +858,11 @@
                         Please check your inbox, retrieve the code, and enter it in the field below to complete the login process. 
                         This additional step ensures your account remains secure. If you do not see the email in your inbox, please check your spam or junk folder.
                     </p>
+                    
+                    <div id="verificationCodeTimer" class="alert alert-info text-center mb-3" style="display: none;">
+                        <i class="fas fa-clock me-2"></i>
+                        <span id="timerText">Code expires in: <strong id="countdown">3:00</strong></span>
+                    </div>
                     
                     <form id="verificationCodeForm">
                         <input type="hidden" id="verificationUserEmail" value="">
@@ -1007,20 +1033,50 @@
         let facebookAppId = null;
         window.fbAsyncInit = function() {
             // Initialize the SDK with your app and the Graph API version for your app
-            getFacebookAppId().then(appId => {
-                if (appId) {
-                    facebookAppId = appId;
+            // Check if getFacebookAppId is available (from social-login.js)
+            if (typeof getFacebookAppId === 'function') {
+                getFacebookAppId().then(appId => {
+                    if (appId) {
+                        facebookAppId = appId;
+                        const fbVersion = frontendConfig.facebook?.version || 'v24.0';
+                        FB.init({
+                            appId: appId,
+                            xfbml: true,
+                            version: fbVersion
+                        });
+                        console.log('Facebook SDK initialized');
+                    } else {
+                        console.warn('Facebook App ID not configured');
+                    }
+                }).catch(err => {
+                    console.warn('Failed to get Facebook App ID:', err);
+                    // Try to use config if available
+                    if (frontendConfig.facebook && frontendConfig.facebook.appId) {
+                        facebookAppId = frontendConfig.facebook.appId;
+                        const fbVersion = frontendConfig.facebook?.version || 'v24.0';
+                        FB.init({
+                            appId: facebookAppId,
+                            xfbml: true,
+                            version: fbVersion
+                        });
+                        console.log('Facebook SDK initialized from config');
+                    }
+                });
+            } else {
+                // Function not loaded yet, try to use config directly
+                if (frontendConfig.facebook && frontendConfig.facebook.appId) {
+                    facebookAppId = frontendConfig.facebook.appId;
                     const fbVersion = frontendConfig.facebook?.version || 'v24.0';
                     FB.init({
-                        appId: appId,
+                        appId: facebookAppId,
                         xfbml: true,
                         version: fbVersion
                     });
-                    console.log('Facebook SDK initialized');
+                    console.log('Facebook SDK initialized from config (getFacebookAppId not available)');
                 } else {
-                    console.warn('Facebook App ID not configured');
+                    console.warn('Facebook App ID not configured and getFacebookAppId function not available');
                 }
-            });
+            }
         };
         
         // Load configuration when page loads
@@ -1097,8 +1153,24 @@
                         document.getElementById('portCount').textContent = 'No ports with valid coordinates found';
                         console.warn('No ports with valid coordinates found');
                     } else {
+                        // Ensure map is initialized before displaying markers
+                        if (!map && typeof L !== 'undefined') {
+                            initializeMap();
+                        }
                         // Display all ports as markers on the map
-                        displayAllPortsMarkers();
+                        if (map) {
+                            displayAllPortsMarkers();
+                        } else {
+                            // Retry after a short delay if map still not initialized
+                            setTimeout(() => {
+                                if (!map && typeof L !== 'undefined') {
+                                    initializeMap();
+                                }
+                                if (map && allPorts.length > 0) {
+                                    displayAllPortsMarkers();
+                                }
+                            }, 500);
+                        }
                     }
                 })
                 .catch(error => {
@@ -1484,6 +1556,17 @@
         function showLoginModal() {
             const modal = new bootstrap.Modal(document.getElementById('loginModal'));
             modal.show();
+            
+            // Clear error messages and resend section
+            const errorDiv = document.getElementById('loginErrorMessage');
+            const errorTextDiv = document.getElementById('loginErrorText');
+            const resendSection = document.getElementById('loginResendCodeSection');
+            if (errorDiv) errorDiv.style.display = 'none';
+            if (errorTextDiv) errorTextDiv.textContent = '';
+            if (resendSection) resendSection.style.display = 'none';
+            
+            // Reset form
+            document.getElementById('loginModalForm').reset();
         }
         
         function showRegisterModal() {
@@ -1530,6 +1613,12 @@
                     document.getElementById('heroSection').style.display = 'block';
                     document.getElementById('myInterestsNavItem').style.display = 'none';
                     document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+                    document.getElementById('featuresNavItem').style.display = 'none';
+                    document.getElementById('apiDocsNavItem').style.display = 'none';
+                    document.getElementById('healthNavItem').style.display = 'none';
+                    document.getElementById('features').style.display = 'none';
+                    document.getElementById('statsSection').style.display = 'none';
+                    document.getElementById('techStackSection').style.display = 'none';
                     document.getElementById('myPersonalInterests').style.display = 'none';
                     document.getElementById('userRecommendations').style.display = 'none';
                 }
@@ -1541,6 +1630,10 @@
                 document.getElementById('heroSection').style.display = 'block';
                 document.getElementById('myInterestsNavItem').style.display = 'none';
                 document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+                document.getElementById('featuresNavItem').style.display = 'none';
+                document.getElementById('apiDocsNavItem').style.display = 'none';
+                document.getElementById('healthNavItem').style.display = 'none';
+                document.getElementById('features').style.display = 'none';
                 document.getElementById('myPersonalInterests').style.display = 'none';
                 document.getElementById('userRecommendations').style.display = 'none';
             });
@@ -1564,8 +1657,16 @@
                 // Show "My Interests" navigation link
                 document.getElementById('myInterestsNavItem').style.display = 'block';
                 
-                // Hide admin maintenance link for USER role
+                // Hide admin-only navigation items for USER role
                 document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+                document.getElementById('featuresNavItem').style.display = 'none';
+                document.getElementById('apiDocsNavItem').style.display = 'none';
+                document.getElementById('healthNavItem').style.display = 'none';
+                
+                // Hide admin-only sections
+                document.getElementById('features').style.display = 'none';
+                document.getElementById('statsSection').style.display = 'none';
+                document.getElementById('techStackSection').style.display = 'none';
                 
                 // Show interests section first (replaces hero section)
                 document.getElementById('myPersonalInterests').style.display = 'block';
@@ -1574,7 +1675,7 @@
                 document.getElementById('userRecommendations').style.display = 'block';
                 document.getElementById('userName').textContent = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
                 
-                // Keep other sections visible (ports, foodie, features)
+                // Keep other sections visible (ports, foodie)
                 // They will appear in order after userRecommendations
                 
                 // Scroll to top to show personalized welcome
@@ -1583,17 +1684,28 @@
                 // Load ports for user recommendations dropdown
                 loadPortsForUserRecommendations();
                 
+                // Load passenger ship info and approaching port
+                loadPassengerShipInfo(user.userId);
+                
                 // Load saved interests
                 loadSavedInterests();
             } else if (user.role === 'ADMIN') {
-                // ADMIN users don't see these sections
+                // ADMIN users see admin-only sections
                 document.getElementById('heroSection').style.display = 'block';
                 document.getElementById('myInterestsNavItem').style.display = 'none';
                 document.getElementById('myPersonalInterests').style.display = 'none';
                 document.getElementById('userRecommendations').style.display = 'none';
                 
-                // Show admin maintenance link
+                // Show admin-only navigation items
                 document.getElementById('adminMaintenanceNavItem').style.display = 'block';
+                document.getElementById('featuresNavItem').style.display = 'block';
+                document.getElementById('apiDocsNavItem').style.display = 'block';
+                document.getElementById('healthNavItem').style.display = 'block';
+                
+                // Show admin-only sections
+                document.getElementById('features').style.display = 'block';
+                document.getElementById('statsSection').style.display = 'block';
+                document.getElementById('techStackSection').style.display = 'block';
                 
                 // Set admin maintenance link URL
                 const basePath = getBasePath();
@@ -1606,8 +1718,14 @@
                 }
                 document.getElementById('adminMaintenanceLink').href = adminUrl;
             } else {
-                // Other roles - hide admin link
+                // Other roles - hide admin link and admin-only items
                 document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+                document.getElementById('featuresNavItem').style.display = 'none';
+                document.getElementById('apiDocsNavItem').style.display = 'none';
+                document.getElementById('healthNavItem').style.display = 'none';
+                document.getElementById('features').style.display = 'none';
+                document.getElementById('statsSection').style.display = 'none';
+                document.getElementById('techStackSection').style.display = 'none';
             }
         }
         
@@ -1705,7 +1823,20 @@
                     }
                 } else {
                     const error = await response.text();
-                    errorDiv.textContent = error || 'Invalid email or password';
+                    const errorTextDiv = document.getElementById('loginErrorText');
+                    const resendSection = document.getElementById('loginResendCodeSection');
+                    const loginEmail = document.getElementById('loginEmail').value.trim();
+                    
+                    // Check if error is about email verification
+                    if (error && error.includes('verify your email address')) {
+                        errorTextDiv.textContent = error;
+                        // Store email for resend functionality
+                        document.getElementById('loginResendCodeBtn').setAttribute('data-email', loginEmail);
+                        resendSection.style.display = 'block';
+                    } else {
+                        errorTextDiv.textContent = error || 'Invalid email or password';
+                        resendSection.style.display = 'none';
+                    }
                     errorDiv.style.display = 'block';
                 }
             } catch (error) {
@@ -1841,6 +1972,248 @@
             loadUserRecommendations(user.userId, portId);
         });
         
+        // Load ALS recommendations and update matched interests text
+        async function loadAlsRecommendations(userId, portId) {
+            const basePath = getBasePath();
+            
+            try {
+                // Get passenger ID
+                let passengerId = userId;
+                try {
+                    const passengerResponse = await fetch(`${basePath}/passengers?userId=${userId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (passengerResponse.ok) {
+                        const passengers = await passengerResponse.json();
+                        if (passengers && Array.isArray(passengers) && passengers.length > 0) {
+                            passengerId = passengers[0].id;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not fetch passengers for ALS recommendations:', e);
+                    return;
+                }
+                
+                // Fetch ALS recommendations
+                const alsResponse = await fetch(`${basePath}/passengers/${passengerId}/als-recommendations?portId=${portId}`, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                if (alsResponse.ok) {
+                    const alsData = await alsResponse.json();
+                    console.log('ALS recommendations response:', alsData);
+                    const matchedInterestsEl = document.getElementById('matchedInterestsText');
+                    
+                    if (matchedInterestsEl) {
+                        if (alsData.recommendations && alsData.recommendations.length > 0) {
+                            // Format recommendations: take top 3-5 and format nicely
+                            const topRecommendations = alsData.recommendations.slice(0, 5);
+                            console.log('Top recommendations:', topRecommendations);
+                            
+                            const recommendationsText = topRecommendations
+                                .map(rec => {
+                                    // Handle different response formats
+                                    if (typeof rec === 'string') {
+                                        return rec; // Direct string recommendation
+                                    } else if (rec.itemName) {
+                                        return rec.itemName;
+                                    } else if (rec.category) {
+                                        return rec.category;
+                                    } else if (rec.feature) {
+                                        return rec.feature;
+                                    } else if (rec.name) {
+                                        return rec.name;
+                                    }
+                                    return '';
+                                })
+                                .filter(text => text && text.trim() !== '')
+                                .join(', ');
+                            
+                            if (recommendationsText && recommendationsText.trim() !== '') {
+                                matchedInterestsEl.textContent = recommendationsText;
+                                console.log('Successfully updated matchedInterestsText with ALS recommendations:', recommendationsText);
+                            } else {
+                                // Try to load from JSON file as fallback
+                                console.log('No valid recommendations in response, trying to load from JSON file...');
+                                await tryLoadRecommendationsFromJson(passengerId, portId, matchedInterestsEl);
+                            }
+                        } else {
+                            // No recommendations found, try JSON file fallback
+                            console.log('No ALS recommendations found in response, trying JSON file fallback...');
+                            await tryLoadRecommendationsFromJson(passengerId, portId, matchedInterestsEl);
+                        }
+                    } else {
+                        console.warn('matchedInterestsText element not found in DOM');
+                    }
+                } else {
+                    const errorText = await alsResponse.text();
+                    console.log('ALS recommendations endpoint returned error:', alsResponse.status, errorText);
+                    const matchedInterestsEl = document.getElementById('matchedInterestsText');
+                    if (matchedInterestsEl) {
+                        // Try JSON file fallback on error
+                        await tryLoadRecommendationsFromJson(passengerId, portId, matchedInterestsEl);
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading ALS recommendations:', e);
+                // Try JSON file fallback on error
+                const matchedInterestsEl = document.getElementById('matchedInterestsText');
+                if (matchedInterestsEl) {
+                    await tryLoadRecommendationsFromJson(passengerId, portId, matchedInterestsEl);
+                }
+            }
+        }
+        
+        // Fallback function to load recommendations from JSON file
+        async function tryLoadRecommendationsFromJson(passengerId, portId, matchedInterestsEl) {
+            try {
+                // Get port code from portId (we'll need to fetch it)
+                const portResponse = await fetch(`${getBasePath()}/ports/${portId}`, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                let portCode = null;
+                if (portResponse.ok) {
+                    const portData = await portResponse.json();
+                    portCode = portData.portCode;
+                }
+                
+                if (!portCode) {
+                    console.warn('Could not get port code for JSON fallback');
+                    matchedInterestsEl.textContent = 'recommendations';
+                    return;
+                }
+                
+                // Try to load JSON file from notebooks folder
+                // Use the basePath which includes /api/v1 context path
+                const basePath = getBasePath();
+                const jsonUrl = `${basePath}/notebooks/recommendations_${passengerId}_${portCode}.json`;
+                console.log('Attempting to load recommendations from JSON file:', jsonUrl);
+                
+                const jsonResponse = await fetch(jsonUrl, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                if (jsonResponse.ok) {
+                    const jsonData = await jsonResponse.json();
+                    console.log('Loaded recommendations from JSON file:', jsonData);
+                    
+                    if (jsonData.recommendations && jsonData.recommendations.length > 0) {
+                        // Handle different formats: array of strings or array of objects
+                        const recommendationsText = jsonData.recommendations
+                            .slice(0, 5)
+                            .map(rec => {
+                                if (typeof rec === 'string') {
+                                    return rec;
+                                } else if (rec.itemName) {
+                                    return rec.itemName;
+                                } else if (rec.category) {
+                                    return rec.category;
+                                } else if (rec.feature) {
+                                    return rec.feature;
+                                } else if (rec.name) {
+                                    return rec.name;
+                                }
+                                return '';
+                            })
+                            .filter(text => text && text.trim() !== '')
+                            .join(', ');
+                        
+                        if (recommendationsText && recommendationsText.trim() !== '') {
+                            matchedInterestsEl.textContent = recommendationsText;
+                            console.log('Successfully loaded recommendations from JSON file:', recommendationsText);
+                            return;
+                        }
+                    }
+                } else {
+                    console.log('JSON file not found or error:', jsonResponse.status);
+                }
+            } catch (e) {
+                console.error('Error loading recommendations from JSON file:', e);
+            }
+            
+            // Final fallback
+            matchedInterestsEl.textContent = 'recommendations';
+        }
+        
+        // Load passenger ship info and approaching port
+        async function loadPassengerShipInfo(userId) {
+            const basePath = getBasePath();
+            
+            try {
+                // Get passenger ID (will auto-create if needed)
+                let passengerId = userId; // Fallback
+                
+                try {
+                    const passengerResponse = await fetch(`${basePath}/passengers?userId=${userId}`, {
+                        headers: getAuthHeaders(),
+                        credentials: 'include'
+                    });
+                    
+                    if (passengerResponse.ok) {
+                        const passengers = await passengerResponse.json();
+                        if (passengers && Array.isArray(passengers) && passengers.length > 0) {
+                            passengerId = passengers[0].id;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not fetch passengers, using userId:', e);
+                }
+                
+                // Get ship info
+                const shipInfoResponse = await fetch(`${basePath}/passengers/${passengerId}/ship-info`, {
+                    headers: getAuthHeaders(),
+                    credentials: 'include'
+                });
+                
+                if (shipInfoResponse.ok) {
+                    const shipInfo = await shipInfoResponse.json();
+                    const shipInfoRow = document.getElementById('passengerShipInfoRow');
+                    const shipInfoText = document.getElementById('passengerShipInfoText');
+                    
+                    console.log('Ship info received:', shipInfo);
+                    
+                    if (shipInfo.preferredShipName) {
+                        shipInfoRow.style.display = 'block';
+                        
+                        if (shipInfo.approachingPort) {
+                            // Ship has AIS data and approaching port
+                            const portName = shipInfo.approachingPort.name;
+                            const portCountry = shipInfo.approachingPort.country || '';
+                            const distance = shipInfo.approachingPort.distanceNauticalMiles ? 
+                                Math.round(shipInfo.approachingPort.distanceNauticalMiles) : '';
+                            
+                            // Get recommendations text (will be updated after loading ALS recommendations)
+                            shipInfoText.innerHTML = `You already are on it or want to be on this ship: <strong>${shipInfo.preferredShipName}</strong>, now your preferred ship is aiming or approaching the next port: <strong>${portName}${portCountry ? ', ' + portCountry : ''}</strong>${distance ? ' (' + distance + ' nm away)' : ''}. Once arrived you will be able to enjoy matched interests as <span id="matchedInterestsText">"--HERE--"</span>.`;
+                            
+                            // Load ALS recommendations for this passenger and port
+                            if (shipInfo.approachingPort.id) {
+                                // Call loadAlsRecommendations to replace "--HERE--" with actual recommendations
+                                loadAlsRecommendations(userId, shipInfo.approachingPort.id);
+                            }
+                        } else {
+                            // Ship name available but no port data (ship might not have AIS position yet)
+                            shipInfoText.innerHTML = `Your preferred ship: <strong>${shipInfo.preferredShipName}</strong>. Port information will be available once AIS tracking data is received for this ship.`;
+                            console.log('Ship info: Ship name available but no port data - ship may not have AIS position yet');
+                        }
+                    } else {
+                        shipInfoRow.style.display = 'none';
+                    }
+                } else {
+                    console.warn('Failed to load ship info:', shipInfoResponse.status);
+                    document.getElementById('passengerShipInfoRow').style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error loading passenger ship info:', e);
+                document.getElementById('passengerShipInfoRow').style.display = 'none';
+            }
+        }
+        
         // Load user recommendations
         async function loadUserRecommendations(userId, portId) {
             const basePath = getBasePath();
@@ -1935,6 +2308,18 @@
                         const sparqlData = await sparqlResponse.json();
                         console.log('SPARQL recommendations response:', sparqlData);
                         displaySparqlRecommendations(sparqlData);
+                        
+                        // Update matched interests text
+                        if (sparqlData.recommendations && sparqlData.recommendations.length > 0) {
+                            const interestsText = sparqlData.recommendations.slice(0, 3)
+                                .map(r => r.feature || r.category || '')
+                                .filter(f => f)
+                                .join(', ');
+                            const matchedInterestsEl = document.getElementById('matchedInterestsText');
+                            if (matchedInterestsEl) {
+                                matchedInterestsEl.textContent = interestsText || 'matched interests as recommendations found with SparkML and ALS';
+                            }
+                        }
                     } else {
                         const errorText = await sparqlResponse.text();
                         console.error('SPARQL recommendations error:', sparqlResponse.status, errorText);
@@ -2221,6 +2606,12 @@
             document.getElementById('loginNavItem').style.display = 'block';
             document.getElementById('userNavItem').style.display = 'none';
             document.getElementById('adminMaintenanceNavItem').style.display = 'none';
+            document.getElementById('featuresNavItem').style.display = 'none';
+            document.getElementById('apiDocsNavItem').style.display = 'none';
+            document.getElementById('healthNavItem').style.display = 'none';
+            document.getElementById('features').style.display = 'none';
+            document.getElementById('statsSection').style.display = 'none';
+            document.getElementById('techStackSection').style.display = 'none';
             document.getElementById('myInterestsNavItem').style.display = 'none';
             document.getElementById('heroSection').style.display = 'block';
             document.getElementById('userRecommendations').style.display = 'none';
@@ -2320,19 +2711,52 @@
                 return;
             }
             
-            // Group by category
+            // Group by category and source
             const byCategory = {};
+            const facebookInterests = [];
+            const manualInterests = [];
+            
             interests.forEach(interest => {
                 if (!byCategory[interest.category]) {
                     byCategory[interest.category] = [];
                 }
-                byCategory[interest.category].push(interest.keyword);
+                byCategory[interest.category].push({
+                    keyword: interest.keyword,
+                    source: interest.source || 'MANUAL'
+                });
+                
+                // Track Facebook interests separately
+                if (interest.source === 'SOCIAL_MEDIA') {
+                    facebookInterests.push(interest);
+                } else {
+                    manualInterests.push(interest);
+                }
             });
             
-            let html = '<div class="list-group">';
+            let html = '';
+            
+            // Show Facebook interests section if any
+            if (facebookInterests.length > 0) {
+                html += '<div class="alert alert-info mb-3">';
+                html += '<h6><i class="fab fa-facebook me-2"></i>Interests from Facebook (' + facebookInterests.length + ')</h6>';
+                html += '<small class="text-muted">These interests were automatically extracted from your Facebook likes.</small>';
+                html += '</div>';
+            }
+            
+            html += '<div class="list-group">';
             Object.keys(byCategory).forEach(category => {
-                html += `<div class="list-group-item"><strong>${category}:</strong> `;
-                html += byCategory[category].join(', ');
+                const categoryInterests = byCategory[category];
+                html += '<div class="list-group-item">';
+                html += '<strong>' + category + ':</strong><br>';
+                
+                categoryInterests.forEach((item, index) => {
+                    if (index > 0) html += ', ';
+                    html += item.keyword;
+                    if (item.source === 'SOCIAL_MEDIA') {
+                        html += ' <span class="badge bg-info" title="From Facebook"><i class="fab fa-facebook"></i></span>';
+                    }
+                });
+                
                 html += '</div>';
             });
             html += '</div>';
@@ -2472,6 +2896,14 @@
                 if (response.ok) {
                     const savedInterests = await response.json();
                     displaySavedInterests(savedInterests);
+                    
+                    // Reload ship info to update ship name and port immediately
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    if (user.userId) {
+                        console.log('Reloading ship info after saving interests...');
+                        loadPassengerShipInfo(user.userId);
+                    }
+                    
                     alert('Your interests have been saved successfully!');
                 } else {
                     const error = await response.text();
@@ -2625,14 +3057,64 @@
         }
         
         // Verification Code Modal Functions
+        let verificationTimerInterval = null;
+        let verificationTimerSeconds = 180; // 3 minutes = 180 seconds
+        
         function showVerificationCodeModal(email) {
             document.getElementById('verificationUserEmail').value = email;
             document.getElementById('verificationCodeInput').value = '';
             document.getElementById('verificationCodeErrorMessage').style.display = 'none';
             document.getElementById('verificationCodeSuccessMessage').style.display = 'none';
             
+            // Reset and start timer
+            verificationTimerSeconds = 180; // 3 minutes
+            updateTimerDisplay();
+            const timerDiv = document.getElementById('verificationCodeTimer');
+            timerDiv.style.display = 'block';
+            
+            // Clear any existing timer
+            if (verificationTimerInterval) {
+                clearInterval(verificationTimerInterval);
+            }
+            
+            // Start countdown timer
+            verificationTimerInterval = setInterval(() => {
+                verificationTimerSeconds--;
+                updateTimerDisplay();
+                
+                if (verificationTimerSeconds <= 0) {
+                    clearInterval(verificationTimerInterval);
+                    timerDiv.className = 'alert alert-warning text-center mb-3';
+                    timerDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Code expired!</strong> Please request a new verification code.';
+                    
+                    // Disable submit button
+                    const submitBtn = document.querySelector('#verificationCodeForm button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-ban me-2"></i>Code Expired';
+                    }
+                }
+            }, 1000);
+            
             const modal = new bootstrap.Modal(document.getElementById('verificationCodeModal'));
             modal.show();
+            
+            // Clear timer when modal is hidden
+            const modalElement = document.getElementById('verificationCodeModal');
+            modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+                if (verificationTimerInterval) {
+                    clearInterval(verificationTimerInterval);
+                    verificationTimerInterval = null;
+                }
+                modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+            }, { once: true });
+        }
+        
+        function updateTimerDisplay() {
+            const minutes = Math.floor(verificationTimerSeconds / 60);
+            const seconds = verificationTimerSeconds % 60;
+            const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('countdown').textContent = timeString;
         }
         
         // Handle verification code form submission
@@ -2653,6 +3135,13 @@
                 return;
             }
             
+            // Check if code has expired
+            if (verificationTimerSeconds <= 0) {
+                errorDiv.textContent = 'Verification code has expired. Please request a new code.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
             try {
                 const basePath = getBasePath();
                 const response = await fetch(`${basePath}/auth/verify-code`, {
@@ -2667,11 +3156,27 @@
                 if (response.ok) {
                     const data = await response.json();
                     
+                    console.log("=== VERIFICATION CODE RESPONSE ===");
+                    console.log("Full response:", data);
+                    console.log("Has token:", !!data.token);
+                    console.log("Email:", data.email);
+                    console.log("Email verified:", data.emailVerified);
+                    
+                    // Clear timer
+                    if (verificationTimerInterval) {
+                        clearInterval(verificationTimerInterval);
+                        verificationTimerInterval = null;
+                    }
+                    
                     // Close verification modal
                     bootstrap.Modal.getInstance(document.getElementById('verificationCodeModal')).hide();
                     
                     // If token is returned (login verification), store it and proceed
                     if (data.token) {
+                        console.log("✓ Token received - completing login");
+                        console.log("Token:", data.token.substring(0, 20) + "...");
+                        console.log("User ID:", data.userId);
+                        console.log("Role:", data.role);
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('user', JSON.stringify({
                             token: data.token,
@@ -2697,6 +3202,7 @@
                             }
                             window.location.href = adminUrl;
                         } else {
+                            console.log("Showing user interface for regular user");
                             showUserInterface({
                                 email: data.email,
                                 userId: data.userId,
@@ -2706,9 +3212,27 @@
                             });
                         }
                     } else {
-                        // Registration verification - show success and allow login
-                        alert('Email verified successfully! You can now log in.');
-                        showLoginModal();
+                        // No token returned - this should not happen for login flow
+                        console.error("⚠⚠⚠ ERROR: Email verified but NO TOKEN returned!");
+                        console.error("This indicates a backend issue - token should be returned for login flow");
+                        console.error("Response data:", JSON.stringify(data, null, 2));
+                        
+                        // For existing users verifying email during login, backend should return token
+                        // If it doesn't, there's a backend issue. Show error and ask user to log in again.
+                        errorDiv.textContent = 'Email verified successfully, but login completion failed. Please try logging in again.';
+                        errorDiv.style.display = 'block';
+                        
+                        // Don't close modal yet - show error message
+                        // After 3 seconds, close and show login
+                        setTimeout(() => {
+                            bootstrap.Modal.getInstance(document.getElementById('verificationCodeModal')).hide();
+                            alert('Email verified successfully! Please log in again with your password.');
+                            showLoginModal();
+                            // Pre-fill email if available
+                            if (data.email) {
+                                document.getElementById('loginEmail').value = data.email;
+                            }
+                        }, 3000);
                     }
                 } else {
                     const error = await response.text();
@@ -2720,6 +3244,70 @@
                 errorDiv.style.display = 'block';
             }
         });
+        
+        // Resend verification code from login modal
+        async function resendCodeFromLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const errorDiv = document.getElementById('loginErrorMessage');
+            const errorTextDiv = document.getElementById('loginErrorText');
+            const resendBtn = document.getElementById('loginResendCodeBtn');
+            const resendSection = document.getElementById('loginResendCodeSection');
+            
+            if (!email) {
+                errorTextDiv.textContent = 'Please enter your email address first.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Disable button temporarily
+            resendBtn.disabled = true;
+            resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending...';
+            
+            try {
+                const basePath = getBasePath();
+                const response = await fetch(`${basePath}/auth/resend-code`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Close login modal immediately
+                    const loginModalInstance = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    if (loginModalInstance) {
+                        loginModalInstance.hide();
+                    }
+                    
+                    // Show verification code modal immediately
+                    showVerificationCodeModal(email);
+                    
+                    // Show success message in verification modal
+                    const successDiv = document.getElementById('verificationCodeSuccessMessage');
+                    successDiv.textContent = data.message || 'Verification code sent successfully! Please check your inbox at ' + email;
+                    successDiv.style.display = 'block';
+                    
+                    // Hide error message if visible
+                    const errorDivInModal = document.getElementById('verificationCodeErrorMessage');
+                    errorDivInModal.style.display = 'none';
+                } else {
+                    const error = await response.text();
+                    errorTextDiv.textContent = error || 'Failed to resend code. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorTextDiv.textContent = 'Failed to resend code. Please try again.';
+                errorDiv.style.display = 'block';
+            } finally {
+                // Re-enable button
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = '<i class="fas fa-redo me-2"></i>Resend Verification Code';
+            }
+        }
         
         // Resend verification code
         async function resendVerificationCode() {
@@ -2756,6 +3344,43 @@
                     
                     // Clear code input
                     document.getElementById('verificationCodeInput').value = '';
+                    
+                    // Reset and restart timer
+                    verificationTimerSeconds = 180; // Reset to 3 minutes
+                    updateTimerDisplay();
+                    const timerDiv = document.getElementById('verificationCodeTimer');
+                    timerDiv.style.display = 'block';
+                    timerDiv.className = 'alert alert-info text-center mb-3';
+                    timerDiv.innerHTML = '<i class="fas fa-clock me-2"></i><span id="timerText">Code expires in: <strong id="countdown">3:00</strong></span>';
+                    
+                    // Clear existing timer and start new one
+                    if (verificationTimerInterval) {
+                        clearInterval(verificationTimerInterval);
+                    }
+                    verificationTimerInterval = setInterval(() => {
+                        verificationTimerSeconds--;
+                        updateTimerDisplay();
+                        
+                        if (verificationTimerSeconds <= 0) {
+                            clearInterval(verificationTimerInterval);
+                            timerDiv.className = 'alert alert-warning text-center mb-3';
+                            timerDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Code expired!</strong> Please request a new verification code.';
+                            
+                            // Disable submit button
+                            const submitBtn = document.querySelector('#verificationCodeForm button[type="submit"]');
+                            if (submitBtn) {
+                                submitBtn.disabled = true;
+                                submitBtn.innerHTML = '<i class="fas fa-ban me-2"></i>Code Expired';
+                            }
+                        }
+                    }, 1000);
+                    
+                    // Re-enable submit button if it was disabled
+                    const submitBtn = document.querySelector('#verificationCodeForm button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Verify';
+                    }
                 } else {
                     const error = await response.text();
                     errorDiv.textContent = error || 'Failed to resend code. Please try again.';
@@ -2771,6 +3396,19 @@
             }
         }
     </script>
+    
+    <!-- Toast Notification Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+        <div id="notificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="5000">
+            <div class="toast-header">
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                <!-- Notification message will be inserted here -->
+            </div>
+        </div>
+    </div>
     
     <!-- Social Login Functions -->
     <script th:src="@{/static/js/security/social-login.js}" src="/static/js/security/social-login.js"></script>

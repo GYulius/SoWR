@@ -111,5 +111,39 @@ public class PrometheusMetricsService {
         // For now, return 0 as placeholder
         return 0.0;
     }
+    
+    /**
+     * Increment a counter with optional tags
+     */
+    public void incrementCounter(String counterName, String... tags) {
+        Counter.Builder builder = Counter.builder(counterName)
+                .description("Counter: " + counterName);
+        
+        // Add tags (must be even number: key1, value1, key2, value2, ...)
+        if (tags.length % 2 == 0) {
+            for (int i = 0; i < tags.length; i += 2) {
+                builder.tag(tags[i], tags[i + 1]);
+            }
+        }
+        
+        builder.register(meterRegistry).increment();
+    }
+    
+    /**
+     * Record a timer duration
+     */
+    public void recordTimer(String timerName, long durationMs, String... tags) {
+        Timer.Builder builder = Timer.builder(timerName)
+                .description("Timer: " + timerName);
+        
+        // Add tags (must be even number: key1, value1, key2, value2, ...)
+        if (tags.length % 2 == 0) {
+            for (int i = 0; i < tags.length; i += 2) {
+                builder.tag(tags[i], tags[i + 1]);
+            }
+        }
+        
+        builder.register(meterRegistry).record(durationMs, TimeUnit.MILLISECONDS);
+    }
 }
 

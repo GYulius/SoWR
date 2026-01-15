@@ -1,0 +1,8 @@
+{
+  "passengerId": 2,
+  "portCode": "NZWLG",
+  "recommendations": ["Hangi", "Pavlova", "Weta Cave"],
+  "count": 3,
+  "algorithm": "SparkML ALS (Alternating Least Squares)",
+  "generatedAt": "2026-01-15T07:35:04.847349"
+}

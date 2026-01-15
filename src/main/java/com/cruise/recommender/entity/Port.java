@@ -94,6 +94,12 @@ public class Port {
     @Column(name = "general_interests", columnDefinition = "JSON")
     private String generalInterests; // General Interests keywords (GENERAL category) - e.g., History, Art, Nature
     
+    @Column(name = "meal_venues", columnDefinition = "JSON")
+    private String mealVenues; // Meal Venues (MEAL_VENUE category) - e.g., Coffee shops, Cafes, Food courts
+    
+    @Column(name = "culinary_ingredients", columnDefinition = "JSON")
+    private String culinaryIngredients; // Culinary Ingredients (CULINARY_INGREDIENTS category) - e.g., Fresh seafood, Local spices
+    
     @CreatedDate
     @Column(name = "created_at")
     private LocalDateTime createdAt;
