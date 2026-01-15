@@ -22,7 +22,11 @@ import java.util.Map;
  * Uses PG_FeatureServ API which is OGC and OpenAPI compliant
  * Collections available: latest_position, ship, traj, positions
  * Supports CQL (Common Query Language) filters for querying
+ * 
+ * @deprecated This service is deprecated. Use VesselFinderApiClient instead.
+ * This service is kept for backward compatibility but should not be used in new code.
  */
+@Deprecated
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -78,6 +82,7 @@ public class OpenAisApiClient {
             String url = buildApiUrl(minLat, maxLat, minLng, maxLng, mmsi, timeWindow);
             log.debug("Fetching AIS data from Open-AIS API: {}", url);
             
+            @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             
             if (response != null && response.containsKey("features")) {
@@ -149,7 +154,10 @@ public class OpenAisApiClient {
      * Based on latest_position collection schema:
      * - MMSI, time_bucket, IMO, callsign, flag, name, type_and_cargo, type, sub_type
      * - draught, geom (position), COG, SOG, nav_status, nav_description
+     * 
+     * @deprecated This service is deprecated. Use VesselFinderApiClient instead.
      */
+    @Deprecated
     @SuppressWarnings("unchecked")
     private AisDataMessage convertFeatureToMessage(Map<String, Object> feature) {
         try {
@@ -317,6 +325,7 @@ public class OpenAisApiClient {
     public List<String> getAvailableCollections() {
         try {
             String url = apiBaseUrl + "/collections";
+            @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             
             if (response != null && response.containsKey("collections")) {
@@ -351,6 +360,7 @@ public class OpenAisApiClient {
     public Map<String, Object> checkHealth() {
         try {
             String url = apiBaseUrl + "/functions/health_check/items";
+            @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             return response;
         } catch (Exception e) {
